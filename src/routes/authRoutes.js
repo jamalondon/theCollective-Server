@@ -1,50 +1,104 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
-const User = mongoose.model('User');
+const supabase = require('../supabase');
+const { hashPassword, comparePassword } = require('../supabaseSchemas');
+const AppError = require('../utils/AppError');
+const {
+	validateSignup,
+	validateSignin,
+} = require('../middlewares/validators/authValidator');
 
 const router = express.Router();
 
-router.post('/signup', async (req, res) => {
-	//destructure email and password from the request body
+router.post('/signup', validateSignup, async (req, res, next) => {
 	const { email, password, name, dateOfBirth } = req.body;
 
 	try {
-		//create a new user
-		const user = new User({ email, password, name, dateOfBirth });
+		// Check if user already exists
+		const { data: existingUser, error: checkError } = await supabase
+			.from('users')
+			.select('id')
+			.eq('email', email)
+			.single();
 
-		//save the user to the database
-		await user.save();
+		if (existingUser) {
+			return next(new AppError('Email already in use', 400));
+		}
 
-		//generate a token for the user using jwt
-		const token = jwt.sign({ userID: user._id }, 'MY_SECRET_KEY');
+		// Hash the password
+		const hashedPassword = await hashPassword(password);
 
-		//send the token back to the user
-		res.send({ token, userID: user._id });
+		// Create a new user
+		const { data: newUser, error: createError } = await supabase
+			.from('users')
+			.insert([
+				{
+					email,
+					password: hashedPassword,
+					name,
+					date_of_birth: dateOfBirth,
+				},
+			])
+			.select()
+			.single();
+
+		if (createError) throw createError;
+
+		// Generate a token for the user using jwt
+		const token = jwt.sign({ userID: newUser.id }, process.env.JWT_SECRET, {
+			expiresIn: '7d',
+		});
+
+		// Send the token back to the user with simplified response
+		res.status(201).json({
+			token,
+			userID: newUser.id,
+			name: newUser.name,
+			email: newUser.email,
+			profilePicture: newUser.profile_picture,
+		});
 	} catch (err) {
-		return res.status(422).send(err.message);
+		next(err);
 	}
 });
 
-router.post('/signin', async (req, res) => {
+router.post('/signin', validateSignin, async (req, res, next) => {
 	const { email, password } = req.body;
 
-	if (!email || !password) {
-		return res.status(422).send({ err: 'Must provide email and password' });
-	}
-
-	const user = await User.findOne({ email });
-
-	if (!user) {
-		return res.status(422).send({ err: 'Invalid password or email' });
-	}
-
 	try {
-		await user.comparePassword(password);
-		const token = jwt.sign({ userID: user._id }, '101774');
-		res.send({ token, userID: user._id });
+		// Get user from Supabase
+		const { data: user, error: findError } = await supabase
+			.from('users')
+			.select('*')
+			.eq('email', email)
+			.single();
+
+		if (findError || !user) {
+			return next(new AppError('Invalid email or password', 401));
+		}
+
+		// Compare passwords
+		const isMatch = await comparePassword(password, user.password);
+		if (!isMatch) {
+			return next(new AppError('Invalid email or password', 401));
+		}
+
+		// Generate JWT token
+		const token = jwt.sign({ userID: user.id }, process.env.JWT_SECRET, {
+			expiresIn: '7d',
+		});
+
+		// Simplified response structure
+		res.json({
+			token,
+			userID: user.id,
+			name: user.name,
+			email: user.email,
+			dateOfBirth: user.date_of_birth,
+			profilePicture: user.profile_picture,
+		});
 	} catch (err) {
-		return res.status(422).send({ err: 'Invalid password or email' });
+		next(err);
 	}
 });
 

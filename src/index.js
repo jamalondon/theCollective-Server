@@ -1,9 +1,36 @@
-require('./models/User');
+//ENV variables
+const dotenv = require('dotenv');
+dotenv.config({ path: './.env' });
+// Load environment variables based on NODE_ENV
+if (process.env.NODE_ENV === 'production') {
+	dotenv.config({ path: '.env.production' });
+} else {
+	dotenv.config({ path: '.env.development' });
+}
+
+console.log(`Connected to ${process.env.NODE_ENV} environment`);
+
+// Initialize Supabase client
+const supabase = require('./supabase');
+
+//libraries
+//express is a web framework for node.js
+//mongoose is an ODM for MongoDB and Node.js
+//body-parser is a middleware to parse incoming request bodies in a middleware before your handlers
 const express = require('express');
 const mongoose = require('mongoose');
-const authRoutes = require('./routes/authRoutes');
 const bodyParser = require('body-parser');
+
+//routes
+const authRoutes = require('./routes/authRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const userRoutes = require('./routes/userRoutes');
+const sermonSeriesRoutes = require('./routes/sermonSeriesRoutes');
+const sermonDiscussionRoutes = require('./routes/sermonDiscussionRoutes');
+
+//middlewares
 const requireAuth = require('./middlewares/requireAuth');
+const errorHandler = require('./middlewares/errorHandler');
 
 //represents our whole API. Atleast the root of it
 const app = express();
@@ -11,21 +38,26 @@ const app = express();
 app.use(express.json());
 app.use(bodyParser.json());
 app.use('/API/v1/auth', authRoutes);
+app.use('/API/v1/events', eventRoutes);
+app.use('/API/v1/users', userRoutes);
+app.use('/API/v1/sermon-series', sermonSeriesRoutes);
+app.use('/API/v1/sermon-discussions', sermonDiscussionRoutes);
 
-//mongooseURI to connect to the database
-const mongoURI =
-	'mongodb+srv://jamalondon97:X8WlauEJbBhQT4Oe@users.vwnwz.mongodb.net/development?retryWrites=true&w=majority&appName=Users';
+// Error handling middleware (must be last)
+app.use(errorHandler);
 
-//connection method
-mongoose.connect(mongoURI);
+// Test Supabase connection
+const testSupabaseConnection = async () => {
+	try {
+		const { data, error } = await supabase.auth.getSession();
+		if (error) throw error;
+		console.log('Successfully connected to Supabase');
+	} catch (err) {
+		console.error('Error connecting to Supabase:', err.message);
+	}
+};
 
-mongoose.connection.on('connected', () => {
-	console.log('Connected to mongo instance');
-});
-
-mongoose.connection.on('error', (err) => {
-	console.error('Error connecting to mongo', err);
-});
+testSupabaseConnection();
 
 //route handler
 app.get('/', requireAuth, (req, res) => {
@@ -33,6 +65,7 @@ app.get('/', requireAuth, (req, res) => {
 });
 
 //make the API listen on port 3000
-app.listen(3000, () => {
-	console.log('Listening on port 3000');
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+	console.log(`Listening on port ${PORT}`);
 });
