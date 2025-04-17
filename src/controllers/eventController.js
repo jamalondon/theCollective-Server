@@ -2,7 +2,7 @@ const supabase = require('../supabase');
 
 // Create a new event
 const createEvent = async (req, res) => {
-	const { title, description, location, date } = req.body;
+	const { title, description, location, date, tags } = req.body;
 
 	// Validate required fields
 	if (!title || !description || !location || !date) {
@@ -40,9 +40,10 @@ const createEvent = async (req, res) => {
 					location,
 					date: new Date(date).toISOString(),
 					owner_id: req.user.id,
+					tags: tags || [],
 				},
 			])
-			.select()
+			.select('*, attendees:event_attendees(user_id)')
 			.single();
 
 		if (createError) throw createError;
@@ -59,22 +60,22 @@ const createEvent = async (req, res) => {
 
 		if (attendeeError) throw attendeeError;
 
-		// Return the created event with owner and attendees
+		// Return the created event with just the owner_id and attendee user_ids
 		const { data: eventWithDetails, error: detailsError } = await supabase
 			.from('events')
-			.select(
-				`
-				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
-			`
-			)
+			.select('*, attendees:event_attendees(user_id)')
 			.eq('id', event.id)
 			.single();
 
 		if (detailsError) throw detailsError;
 
-		res.status(201).send(eventWithDetails);
+		// Transform the response to simplify attendees structure
+		const simplifiedEvent = {
+			...eventWithDetails,
+			attendees: eventWithDetails.attendees.map((attendee) => attendee.user_id),
+		};
+
+		res.status(201).send(simplifiedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -380,6 +381,61 @@ const deleteEvent = async (req, res) => {
 	}
 };
 
+// Search for users
+const searchUsers = async (req, res) => {
+	const { query } = req.query;
+
+	if (!query) {
+		return res.status(400).send({ error: 'Search query is required' });
+	}
+
+	try {
+		const { data: users, error } = await supabase
+			.from('users')
+			.select('id, name, username, avatar_url')
+			.or(`name.ilike.%${query}%,username.ilike.%${query}%`)
+			.limit(10);
+
+		if (error) throw error;
+		res.send(users);
+	} catch (err) {
+		res.status(500).send({ error: err.message });
+	}
+};
+
+// Search for locations
+const searchLocations = async (req, res) => {
+	const { query } = req.query;
+
+	if (!query) {
+		return res.status(400).send({ error: 'Search query is required' });
+	}
+
+	try {
+		const { data: locations, error } = await supabase
+			.from('locations')
+			.select('id, name, address, city, state')
+			.or(
+				`name.ilike.%${query}%,address.ilike.%${query}%,city.ilike.%${query}%`
+			)
+			.limit(10);
+
+		if (error) throw error;
+
+		// Format locations for frontend display
+		const formattedLocations = locations.map((location) => ({
+			id: location.id,
+			name: location.name,
+			subtitle: `${location.city}, ${location.state}`,
+			address: location.address,
+		}));
+
+		res.send(formattedLocations);
+	} catch (err) {
+		res.status(500).send({ error: err.message });
+	}
+};
+
 module.exports = {
 	createEvent,
 	getAllEvents,
@@ -390,4 +446,6 @@ module.exports = {
 	attendEvent,
 	cancelAttendance,
 	deleteEvent,
+	searchUsers,
+	searchLocations,
 };

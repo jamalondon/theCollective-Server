@@ -19,6 +19,12 @@ router.get('/my-events', eventController.getMyEvents);
 // Get events that the user is attending but not hosting
 router.get('/attending', eventController.getAttendingEvents);
 
+// Search for users
+router.get('/users/search', eventController.searchUsers);
+
+// Search for locations
+router.get('/locations/search', eventController.searchLocations);
+
 // Get a specific event by ID
 router.get('/:id', eventController.getEventById);
 

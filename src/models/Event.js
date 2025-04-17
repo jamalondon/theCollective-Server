@@ -10,6 +10,10 @@ const eventSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
+		tags: {
+			type: [String],
+			default: [],
+		},
 		attendees: [
 			{
 				type: mongoose.Schema.Types.ObjectId,
