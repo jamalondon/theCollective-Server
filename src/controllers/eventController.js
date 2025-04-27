@@ -43,7 +43,7 @@ const createEvent = async (req, res) => {
 					tags: tags || [],
 				},
 			])
-			.select('*, attendees:event_attendees(user_id)')
+			.select()
 			.single();
 
 		if (createError) throw createError;
@@ -60,22 +60,34 @@ const createEvent = async (req, res) => {
 
 		if (attendeeError) throw attendeeError;
 
-		// Return the created event with just the owner_id and attendee user_ids
+		// Get the created event with owner details and attendees
 		const { data: eventWithDetails, error: detailsError } = await supabase
 			.from('events')
-			.select('*, attendees:event_attendees(user_id)')
+			.select(
+				`
+				*,
+				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
+			`
+			)
 			.eq('id', event.id)
 			.single();
 
 		if (detailsError) throw detailsError;
 
-		// Transform the response to simplify attendees structure
-		const simplifiedEvent = {
-			...eventWithDetails,
-			attendees: eventWithDetails.attendees.map((attendee) => attendee.user_id),
+		// Transform the response to match getAllEvents format
+		const { owner_id, ...eventWithoutOwnerId } = eventWithDetails;
+		const transformedEvent = {
+			...eventWithoutOwnerId,
+			owner: {
+				...eventWithDetails.owner,
+				id: owner_id,
+			},
 		};
 
-		res.status(201).send(simplifiedEvent);
+		res.status(201).send(transformedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -89,14 +101,29 @@ const getAllEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
-		res.send(events);
+
+		// Transform the response to move owner_id into owner object
+		const transformedEvents = events.map((event) => {
+			const { owner_id, ...eventWithoutOwnerId } = event;
+			return {
+				...eventWithoutOwnerId,
+				owner: {
+					...event.owner,
+					id: owner_id,
+				},
+			};
+		});
+
+		res.send(transformedEvents);
 	} catch (err) {
 		res.status(500).send({ error: err.message });
 	}
@@ -110,8 +137,10 @@ const getMyEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.eq('owner_id', req.user.id)
@@ -132,12 +161,14 @@ const getAttendingEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.not('owner_id', 'eq', req.user.id)
-			.contains('attendees.user.id', [req.user.id])
+			.eq('event_attendees.user_id', req.user.id)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
@@ -155,8 +186,10 @@ const getEventById = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.eq('id', req.params.id)
@@ -273,14 +306,16 @@ const attendEvent = async (req, res) => {
 
 		if (insertError) throw insertError;
 
-		// Get the updated event with owner and attendees
+		// Get the updated event with owner details and attendees
 		const { data: eventWithDetails, error: detailsError } = await supabase
 			.from('events')
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.eq('id', req.params.id)
@@ -288,7 +323,17 @@ const attendEvent = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.send(eventWithDetails);
+		// Transform the response to match getAllEvents format
+		const { owner_id, ...eventWithoutOwnerId } = eventWithDetails;
+		const transformedEvent = {
+			...eventWithoutOwnerId,
+			owner: {
+				...eventWithDetails.owner,
+				id: owner_id,
+			},
+		};
+
+		res.send(transformedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -325,14 +370,16 @@ const cancelAttendance = async (req, res) => {
 
 		if (deleteError) throw deleteError;
 
-		// Get the updated event with owner and attendees
+		// Get the updated event with owner details and attendees
 		const { data: eventWithDetails, error: detailsError } = await supabase
 			.from('events')
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.eq('id', req.params.id)
@@ -340,7 +387,17 @@ const cancelAttendance = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.send(eventWithDetails);
+		// Transform the response to match getAllEvents format
+		const { owner_id, ...eventWithoutOwnerId } = eventWithDetails;
+		const transformedEvent = {
+			...eventWithoutOwnerId,
+			owner: {
+				...eventWithDetails.owner,
+				id: owner_id,
+			},
+		};
+
+		res.send(transformedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -392,7 +449,7 @@ const searchUsers = async (req, res) => {
 	try {
 		const { data: users, error } = await supabase
 			.from('users')
-			.select('id, name, username, avatar_url')
+			.select('id, name, username, profile_picture')
 			.or(`name.ilike.%${query}%,username.ilike.%${query}%`)
 			.limit(10);
 

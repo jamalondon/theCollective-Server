@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "cloudinary": "^1.41.3",
     "dotenv": "^16.4.7",
@@ -24,6 +25,7 @@
     "nodemon": "^3.1.9"
   },
   "devDependencies": {
+    "@react-native-community/cli": "latest",
     "cross-env": "^7.0.3"
   }
 }
