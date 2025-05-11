@@ -31,7 +31,7 @@ router.post(
 
 			// Upload file to Supabase Storage
 			const { data, error } = await supabase.storage
-				.from('user-uploads')
+				.from('user-profileimg')
 				.upload(fileName, req.file.buffer, {
 					contentType: req.file.mimetype,
 					upsert: true,
@@ -44,7 +44,7 @@ router.post(
 			// Get the public URL
 			const {
 				data: { publicUrl },
-			} = supabase.storage.from('user-uploads').getPublicUrl(fileName);
+			} = supabase.storage.from('user-profileimg').getPublicUrl(fileName);
 
 			// Update user in Supabase
 			const { error: updateError } = await supabase

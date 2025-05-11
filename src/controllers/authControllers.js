@@ -44,9 +44,7 @@ exports.signup = async (req, res, next) => {
 		if (createError) throw createError;
 
 		// Generate a token for the user using jwt
-		const token = jwt.sign({ userID: newUser.id }, process.env.JWT_SECRET, {
-			expiresIn: '7d',
-		});
+		const token = jwt.sign({ userID: newUser.id }, process.env.JWT_SECRET);
 
 		// Send the token back to the user with simplified response
 		res.status(201).json({
@@ -84,9 +82,7 @@ exports.signin = async (req, res, next) => {
 		}
 
 		// Generate JWT token
-		const token = jwt.sign({ userID: user.id }, process.env.JWT_SECRET, {
-			expiresIn: '7d',
-		});
+		const token = jwt.sign({ userID: user.id }, process.env.JWT_SECRET);
 
 		// Simplified response structure
 		res.json({

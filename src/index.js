@@ -27,6 +27,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const userRoutes = require('./routes/userRoutes');
 const sermonSeriesRoutes = require('./routes/sermonSeriesRoutes');
 const sermonDiscussionRoutes = require('./routes/sermonDiscussionRoutes');
+const prayerRequestRoutes = require('./routes/prayerRequestRoutes');
 
 //middlewares
 const requireAuth = require('./middlewares/requireAuth');
@@ -42,6 +43,7 @@ app.use('/API/v1/events', eventRoutes);
 app.use('/API/v1/users', userRoutes);
 app.use('/API/v1/sermon-series', sermonSeriesRoutes);
 app.use('/API/v1/sermon-discussions', sermonDiscussionRoutes);
+app.use('/API/v1/prayer-requests', prayerRequestRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
