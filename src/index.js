@@ -19,6 +19,7 @@ const supabase = require('./supabase');
 //body-parser is a middleware to parse incoming request bodies in a middleware before your handlers
 const express = require('express');
 const mongoose = require('mongoose');
+const logger = require('morgan');
 const bodyParser = require('body-parser');
 
 //routes
@@ -38,6 +39,7 @@ const app = express();
 
 app.use(express.json());
 app.use(bodyParser.json());
+app.use(logger('dev'));
 app.use('/API/v1/auth', authRoutes);
 app.use('/API/v1/events', eventRoutes);
 app.use('/API/v1/users', userRoutes);
