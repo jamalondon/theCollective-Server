@@ -5,8 +5,16 @@ exports.createPrayerRequest = async (req, res) => {
 		const user = req.user; // from requireAuth middleware
 		const { body, files } = req;
 
-		// Extract text from body
-		const { text } = body;
+		// Extract and validate text from body
+		let { text } = body;
+		if (typeof text === 'string') {
+			text = text.trim();
+		}
+		if (!text) {
+			return res
+				.status(400)
+				.json({ error: 'Prayer request text is required.' });
+		}
 
 		// Upload photos to Supabase Storage
 		let photoUrls = [];
@@ -29,6 +37,10 @@ exports.createPrayerRequest = async (req, res) => {
 			}
 		}
 
+		const title = req.body.title
+			? req.body.title.trim()
+			: 'Pray for ' + user.name;
+
 		// Prepare prayer request object
 		const prayerRequest = {
 			user_info: {
@@ -39,6 +51,7 @@ exports.createPrayerRequest = async (req, res) => {
 			comments: [],
 			photos: photoUrls,
 			text,
+			title,
 		};
 
 		// Insert into Supabase

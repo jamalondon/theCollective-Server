@@ -22,7 +22,7 @@ const mongoose = require('mongoose');
 const logger = require('morgan');
 const bodyParser = require('body-parser');
 
-//routes
+//routes to be used in the API
 const authRoutes = require('./routes/authRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -30,16 +30,28 @@ const sermonSeriesRoutes = require('./routes/sermonSeriesRoutes');
 const sermonDiscussionRoutes = require('./routes/sermonDiscussionRoutes');
 const prayerRequestRoutes = require('./routes/prayerRequestRoutes');
 
-//middlewares
+//middlewares to be used in the API
 const requireAuth = require('./middlewares/requireAuth');
 const errorHandler = require('./middlewares/errorHandler');
+
+//define a custom date format for the logger
+logger.token('localdate', () => {
+	return new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
+});
 
 //represents our whole API. Atleast the root of it
 const app = express();
 
+//using middleware
 app.use(express.json());
 app.use(bodyParser.json());
-app.use(logger('dev'));
+app.use(
+	logger(
+		'Method: :method\nURL: :url\nStatus: :status\nContent-Length: :res[content-length]\nTotal time: :total-time ms\nDate: :localdate (CT)\n\n'
+	)
+);
+
+//all the routes for the API
 app.use('/API/v1/auth', authRoutes);
 app.use('/API/v1/events', eventRoutes);
 app.use('/API/v1/users', userRoutes);
@@ -50,7 +62,7 @@ app.use('/API/v1/prayer-requests', prayerRequestRoutes);
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Test Supabase connection
+// variable to test Supabase connection
 const testSupabaseConnection = async () => {
 	try {
 		const { data, error } = await supabase.auth.getSession();
@@ -61,9 +73,10 @@ const testSupabaseConnection = async () => {
 	}
 };
 
+//test the Supabase connection
 testSupabaseConnection();
 
-//route handler
+//main route handler
 app.get('/', requireAuth, (req, res) => {
 	res.send(`Your email: ${req.user.email}`);
 });

@@ -250,8 +250,10 @@ const updateEvent = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users(name, email),
-				attendees:event_attendees(user:users(name, email))
+				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				attendees:event_attendees!inner(
+					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
+				)
 			`
 			)
 			.eq('id', event.id)
