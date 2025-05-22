@@ -67,6 +67,25 @@ router.post(
 	}
 );
 
+// User search route
+router.get('/search', requireAuth, async (req, res) => {
+	const { query } = req.query;
+	if (!query) {
+		return res.status(400).json({ message: 'Search query is required' });
+	}
+	try {
+		const { data: users, error } = await supabase
+			.from('users')
+			.select('id, name, profile_picture')
+			.ilike('name', `${query}%`)
+			.limit(20);
+		if (error) throw error;
+		res.status(200).json(users);
+	} catch (err) {
+		res.status(500).json({ message: 'Error searching users' });
+	}
+});
+
 // You can add other user-related routes here
 // For example:
 // router.get('/profile', authMiddleware, async (req, res) => { ... });

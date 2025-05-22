@@ -440,28 +440,6 @@ const deleteEvent = async (req, res) => {
 	}
 };
 
-// Search for users
-const searchUsers = async (req, res) => {
-	const { query } = req.query;
-
-	if (!query) {
-		return res.status(400).send({ error: 'Search query is required' });
-	}
-
-	try {
-		const { data: users, error } = await supabase
-			.from('users')
-			.select('id, name, username, profile_picture')
-			.or(`name.ilike.%${query}%,username.ilike.%${query}%`)
-			.limit(10);
-
-		if (error) throw error;
-		res.send(users);
-	} catch (err) {
-		res.status(500).send({ error: err.message });
-	}
-};
-
 // Search for locations
 const searchLocations = async (req, res) => {
 	const { query } = req.query;
@@ -505,6 +483,5 @@ module.exports = {
 	attendEvent,
 	cancelAttendance,
 	deleteEvent,
-	searchUsers,
 	searchLocations,
 };
