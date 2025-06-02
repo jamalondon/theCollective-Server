@@ -43,7 +43,7 @@ exports.createPrayerRequest = async (req, res) => {
 
 		// Prepare prayer request object
 		const prayerRequest = {
-			user_info: {
+			owner: {
 				id: user.id,
 				name: user.name,
 				profile_picture: user.profile_picture,
