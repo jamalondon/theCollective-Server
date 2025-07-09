@@ -96,7 +96,7 @@ exports.deletePrayerRequest = async (req, res) => {
 		// Fetch the prayer request to check ownership
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('user_info')
+			.select('owner')
 			.eq('id', id)
 			.single();
 
@@ -104,7 +104,7 @@ exports.deletePrayerRequest = async (req, res) => {
 			return res.status(404).json({ error: 'Prayer request not found' });
 		}
 
-		if (prayerRequest.user_info.id !== user.id) {
+		if (prayerRequest.owner.id !== user.id) {
 			return res
 				.status(403)
 				.json({ error: 'You can only delete your own prayer requests' });
