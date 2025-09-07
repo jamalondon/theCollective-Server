@@ -26,6 +26,9 @@ const validateSignup = [
 		.withMessage(
 			'Please provide a valid date of birth in ISO format (YYYY-MM-DD)'
 		),
+	body('phoneNumber')
+		.matches(/^\+[1-9]\d{1,14}$/)
+		.withMessage('Please provide a valid phone number in E.164 format (e.g., +1234567890)'),
 	(req, res, next) => {
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
@@ -52,7 +55,42 @@ const validateSignin = [
 	},
 ];
 
+const validateStartVerify = [
+	body('phoneNumber')
+		.matches(/^\+[1-9]\d{1,14}$/)
+		.withMessage('Please provide a valid phone number in E.164 format (e.g., +1234567890)'),
+	(req, res, next) => {
+		const errors = validationResult(req);
+		if (!errors.isEmpty()) {
+			const errorMessages = errors.array().map((err) => err.msg);
+			return next(new AppError(errorMessages.join(', '), 400));
+		}
+		next();
+	},
+];
+
+const validateCheckVerify = [
+	body('phoneNumber')
+		.matches(/^\+[1-9]\d{1,14}$/)
+		.withMessage('Please provide a valid phone number in E.164 format (e.g., +1234567890)'),
+	body('code')
+		.isLength({ min: 4, max: 6 })
+		.withMessage('Verification code must be 4-6 characters long')
+		.matches(/^\d+$/)
+		.withMessage('Verification code must contain only numbers'),
+	(req, res, next) => {
+		const errors = validationResult(req);
+		if (!errors.isEmpty()) {
+			const errorMessages = errors.array().map((err) => err.msg);
+			return next(new AppError(errorMessages.join(', '), 400));
+		}
+		next();
+	},
+];
+
 module.exports = {
 	validateSignup,
 	validateSignin,
+	validateStartVerify,
+	validateCheckVerify,
 };

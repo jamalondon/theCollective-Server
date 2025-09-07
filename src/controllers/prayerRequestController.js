@@ -101,7 +101,7 @@ exports.deletePrayerRequest = async (req, res) => {
 			.single();
 
 		if (fetchError || !prayerRequest) {
-			return res.status(404).json({ error: 'Prayer request not found' });
+			return res.status(404).json({ error: `Prayer request not found` });
 		}
 
 		if (prayerRequest.owner.id !== user.id) {

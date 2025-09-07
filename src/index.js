@@ -33,6 +33,7 @@ const prayerRequestRoutes = require('./routes/prayerRequestRoutes');
 //middlewares to be used in the API
 const requireAuth = require('./middlewares/requireAuth');
 const errorHandler = require('./middlewares/errorHandler');
+const { clearExpiredVerificationCodes } = require('./utils/cleanup');
 
 //define a custom date format for the logger
 logger.token('localdate', () => {
@@ -85,4 +86,8 @@ app.get('/', requireAuth, (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
 	console.log(`Listening on port ${PORT}`);
+	// Schedule periodic cleanup every hour
+	setInterval(() => {
+		clearExpiredVerificationCodes();
+	}, 60 * 60 * 1000);
 });
