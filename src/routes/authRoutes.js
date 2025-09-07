@@ -1,12 +1,14 @@
 const express = require('express');
 const {
 	validateSignup,
+	validateSignupNoPhone,
 	validateSignin,
 	validateStartVerify,
 	validateCheckVerify,
 } = require('../middlewares/validators/authValidator');
 const {
 	signup,
+	signupNoPhone,
 	signin,
 	verifyToken,
 	startVerify,
@@ -16,6 +18,7 @@ const {
 const router = express.Router();
 
 router.post('/signup', validateSignup, signup);
+router.post('/signup-no-phone', validateSignupNoPhone, signupNoPhone);
 router.post('/signin', validateSignin, signin);
 router.post('/verify', verifyToken);
 

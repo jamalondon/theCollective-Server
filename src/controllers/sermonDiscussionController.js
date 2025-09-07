@@ -19,7 +19,7 @@ exports.createDiscussion = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email),
+				created_by:users (name, username, email),
 				sermon_series:sermon_series (title)
 			`
 			)
@@ -43,7 +43,7 @@ exports.getDiscussions = async (req, res) => {
 	try {
 		let query = supabase.from('sermon_discussions').select(`
 				*,
-				created_by:users (name, email),
+				created_by:users (name, username, email),
 				sermon_series:sermon_series (title),
 				comments:sermon_discussion_comments (
 					id,
@@ -91,7 +91,7 @@ exports.getDiscussion = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email),
+				created_by:users (name, username, email),
 				sermon_series:sermon_series (title),
 				comments:sermon_discussion_comments (
 					id,
@@ -159,7 +159,7 @@ exports.updateDiscussion = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email),
+				created_by:users (name, username, email),
 				sermon_series:sermon_series (title)
 			`
 			)

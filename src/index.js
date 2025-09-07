@@ -79,7 +79,7 @@ testSupabaseConnection();
 
 //main route handler
 app.get('/', requireAuth, (req, res) => {
-	res.send(`Your email: ${req.user.email}`);
+	res.send(`Your username: ${req.user.username}`);
 });
 
 //make the API listen on port 3000

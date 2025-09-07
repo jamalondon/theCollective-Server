@@ -10,20 +10,20 @@ const DEFAULT_PROFILE_PICTURE = `${SUPABASE_URL}/storage/v1/object/public/defaul
 
 // Signup controller
 exports.signup = async (req, res, next) => {
-	const { email, password, name, dateOfBirth, phoneNumber } = req.body;
+	const { username, password, name, dateOfBirth, phoneNumber } = req.body;
 	try {
-		// Check if user already exists
-		const { data: existingUser, error: checkError } = await supabase
+		// Check if username already exists
+		const { data: existingUsername, error: usernameCheckError } = await supabase
 			.from('users')
 			.select('id')
-			.eq('email', email)
+			.eq('username', username)
 			.single();
 
-		if (existingUser) {
-			return next(new AppError('Email already in use', 400));
+		if (existingUsername) {
+			return next(new AppError('Username already in use', 400));
 		}
 
-		// Check if phone number already exists
+		// Check if phone number already exists (only if phone number is provided)
 		if (phoneNumber) {
 			const { data: existingPhone, error: phoneCheckError } = await supabase
 				.from('users')
@@ -40,28 +40,48 @@ exports.signup = async (req, res, next) => {
 		const hashedPassword = await hashPassword(password);
 
 		// Create a new user with default profile picture
+		const userData = {
+			username,
+			password: hashedPassword,
+			name,
+			date_of_birth: dateOfBirth,
+			profile_picture: DEFAULT_PROFILE_PICTURE,
+		};
+
+		// Add phone-related fields only if phone number is provided
+		if (phoneNumber) {
+			userData.phone_number = phoneNumber;
+			userData.phone_verified = false;
+		}
+
 		const { data: newUser, error: createError } = await supabase
 			.from('users')
-			.insert([
-				{
-					email,
-					password: hashedPassword,
-					name,
-					date_of_birth: dateOfBirth,
-					profile_picture: DEFAULT_PROFILE_PICTURE,
-					phone_number: phoneNumber,
-					phone_verified: false,
-				},
-			])
+			.insert([userData])
 			.select()
 			.single();
 
 		if (createError) throw createError;
 
-		// Inform client that verification is required
+		// If no phone number provided, user is immediately ready to use (no verification needed)
+		if (!phoneNumber) {
+			// Generate JWT token immediately
+			const token = jwt.sign({ userID: newUser.id }, process.env.JWT_SECRET);
+
+			return res.status(201).json({
+				token,
+				userID: newUser.id,
+				username: newUser.username,
+				name: newUser.name,
+				dateOfBirth: newUser.date_of_birth,
+				profilePicture: newUser.profile_picture,
+				phoneNumber: null,
+			});
+		}
+
+		// If phone number provided, inform client that verification is required
 		res.status(201).json({
 			verificationRequired: true,
-			email: newUser.email,
+			username: newUser.username,
 			phoneNumber: newUser.phone_number,
 			userID: newUser.id,
 		});
@@ -70,33 +90,88 @@ exports.signup = async (req, res, next) => {
 	}
 };
 
+// Signup controller without phone verification (for testing and special cases)
+exports.signupNoPhone = async (req, res, next) => {
+	const { username, password, name, dateOfBirth } = req.body;
+	try {
+		// Check if username already exists
+		const { data: existingUsername, error: usernameCheckError } = await supabase
+			.from('users')
+			.select('id')
+			.eq('username', username)
+			.single();
+
+		if (existingUsername) {
+			return next(new AppError('Username already in use', 400));
+		}
+
+		// Hash the password
+		const hashedPassword = await hashPassword(password);
+
+		// Create a new user without phone number
+		const userData = {
+			username,
+			password: hashedPassword,
+			name,
+			date_of_birth: dateOfBirth,
+			profile_picture: DEFAULT_PROFILE_PICTURE,
+			// Explicitly set phone fields to null
+			phone_number: null,
+			phone_verified: null,
+		};
+
+		const { data: newUser, error: createError } = await supabase
+			.from('users')
+			.insert([userData])
+			.select()
+			.single();
+
+		if (createError) throw createError;
+
+		// Generate JWT token immediately (no verification needed)
+		const token = jwt.sign({ userID: newUser.id }, process.env.JWT_SECRET);
+
+		res.status(201).json({
+			token,
+			userID: newUser.id,
+			username: newUser.username,
+			name: newUser.name,
+			dateOfBirth: newUser.date_of_birth,
+			profilePicture: newUser.profile_picture,
+			phoneNumber: null,
+		});
+	} catch (err) {
+		next(err);
+	}
+};
+
 // Signin controller
 exports.signin = async (req, res, next) => {
-	const { email, password } = req.body;
+	const { username, password } = req.body;
 
 	try {
 		// Get user from Supabase
 		const { data: user, error: findError } = await supabase
 			.from('users')
 			.select('*')
-			.eq('email', email)
+			.eq('username', username)
 			.single();
 
 		if (findError || !user) {
-			return next(new AppError('Invalid email or password', 401));
+			return next(new AppError('Invalid username or password', 401));
 		}
 
 		// Compare passwords
 		const isMatch = await comparePassword(password, user.password);
 		if (!isMatch) {
-			return next(new AppError('Invalid email or password', 401));
+			return next(new AppError('Invalid username or password', 401));
 		}
 
-		// If not verified, ask client to verify via SMS
-		if (!user.phone_verified) {
+		// If user has a phone number but it's not verified, ask client to verify via SMS
+		if (user.phone_number && !user.phone_verified) {
 			return res.status(200).json({
 				verificationRequired: true,
-				email: user.email,
+				username: user.username,
 				phoneNumber: user.phone_number,
 				userID: user.id,
 			});
@@ -109,8 +184,8 @@ exports.signin = async (req, res, next) => {
 		res.json({
 			token,
 			userID: user.id,
+			username: user.username,
 			name: user.name,
-			email: user.email,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,
@@ -147,8 +222,8 @@ exports.verifyToken = async (req, res, next) => {
 		res.json({
 			token, // Return the same token
 			userID: user.id,
+			username: user.username,
 			name: user.name,
-			email: user.email,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,
@@ -164,35 +239,59 @@ exports.verifyToken = async (req, res, next) => {
 // Start SMS verification process
 exports.startVerify = async (req, res, next) => {
 	const { phoneNumber } = req.body;
+	console.log('=== START VERIFY DEBUG ===');
+	console.log('phoneNumber received:', phoneNumber);
+	console.log('phoneNumber type:', typeof phoneNumber);
+	console.log('req.body:', req.body);
 
 	try {
+		// Validate phone number exists
+		if (!phoneNumber) {
+			console.log('ERROR: No phone number provided');
+			return next(new AppError('Phone number is required', 400));
+		}
+
 		// Check if user exists with this phone number
+		console.log('Checking user in database...');
 		const { data: user, error: findError } = await supabase
 			.from('users')
 			.select('id, phone_verified')
 			.eq('phone_number', phoneNumber)
 			.single();
 
+		console.log('Database query result:', { user, findError });
+
 		if (findError || !user) {
+			console.log('ERROR: User not found with phone number:', phoneNumber);
 			return next(new AppError('No user found with this phone number', 404));
 		}
 
 		if (user.phone_verified) {
+			console.log('Phone already verified for user:', user.id);
 			return res.status(200).json({ message: 'Phone number already verified' });
 		}
 
 		// Start Twilio verification
+		console.log('Starting Twilio verification for:', phoneNumber);
 		const verificationResult = await startVerification(phoneNumber);
+		console.log('Twilio verification result:', verificationResult);
 
-		if (!verificationResult.success) {
-			return next(new AppError('Failed to send verification code', 500));
+		if (!verificationResult || !verificationResult.success) {
+			const errorMessage =
+				verificationResult?.error || 'Unknown error occurred';
+			console.log('ERROR: Twilio verification failed:', errorMessage);
+			return next(
+				new AppError(`Failed to send verification code: ${errorMessage}`, 500)
+			);
 		}
 
+		console.log('SUCCESS: Verification code sent');
 		res.status(200).json({
 			message: 'Verification code sent to your phone number',
 			status: verificationResult.status,
 		});
 	} catch (err) {
+		console.log('CATCH ERROR in startVerify:', err);
 		next(err);
 	}
 };
@@ -219,8 +318,8 @@ exports.checkVerify = async (req, res, next) => {
 			return res.status(200).json({
 				token,
 				userID: user.id,
+				username: user.username,
 				name: user.name,
-				email: user.email,
 				dateOfBirth: user.date_of_birth,
 				profilePicture: user.profile_picture,
 				phoneNumber: user.phone_number,
@@ -253,8 +352,8 @@ exports.checkVerify = async (req, res, next) => {
 		res.status(200).json({
 			token,
 			userID: user.id,
+			username: user.username,
 			name: user.name,
-			email: user.email,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,

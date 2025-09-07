@@ -66,7 +66,7 @@ const createEvent = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture),
 				attendees:event_attendees!inner(
 					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
 				)
@@ -101,10 +101,7 @@ const getAllEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email, profile_picture),
-				attendees:event_attendees!inner(
-					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
-				)
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture)
 			`
 			)
 			.order('date', { ascending: true });
@@ -137,10 +134,7 @@ const getMyEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email),
-				attendees:event_attendees!inner(
-					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
-				)
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture)
 			`
 			)
 			.eq('owner_id', req.user.id)
@@ -161,10 +155,7 @@ const getAttendingEvents = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email),
-				attendees:event_attendees!inner(
-					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
-				)
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture)
 			`
 			)
 			.not('owner_id', 'eq', req.user.id)
@@ -186,7 +177,7 @@ const getEventById = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email),
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture),
 				attendees:event_attendees!inner(
 					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
 				)
@@ -250,7 +241,7 @@ const updateEvent = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture),
 				attendees:event_attendees!inner(
 					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
 				)
@@ -314,7 +305,7 @@ const attendEvent = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture),
 				attendees:event_attendees!inner(
 					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
 				)
@@ -378,7 +369,7 @@ const cancelAttendance = async (req, res) => {
 			.select(
 				`
 				*,
-				owner:users!events_owner_id_fkey(name, email, profile_picture),
+				owner:users!events_owner_id_fkey(name, username, email, profile_picture),
 				attendees:event_attendees!inner(
 					user:users!event_attendees_user_id_fkey(id, name, profile_picture)
 				)

@@ -1,4 +1,4 @@
-// Simple in-memory rate limiter by arbitrary key (e.g., email or IP)
+// Simple in-memory rate limiter by arbitrary key (e.g., username or IP)
 // Not distributed-safe; sufficient for small deployments. For scale, use Redis.
 
 /**

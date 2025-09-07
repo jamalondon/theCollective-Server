@@ -39,7 +39,7 @@ exports.getAllSeries = async (req, res) => {
 	try {
 		let query = supabase.from('sermon_series').select(`
 				*,
-				created_by:users (name, email)
+				created_by:users (name, username, email)
 			`);
 
 		// Add search functionality
@@ -92,7 +92,7 @@ exports.getSeries = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email)
+				created_by:users (name, username, email)
 			`
 			)
 			.eq('id', req.params.seriesId)
