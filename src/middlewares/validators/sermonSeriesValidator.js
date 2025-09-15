@@ -1,6 +1,5 @@
 const { body, param, validationResult } = require('express-validator');
 const AppError = require('../../utils/AppError');
-const mongoose = require('mongoose');
 
 const validateSermonSeriesCreate = [
 	body('title')
@@ -122,8 +121,9 @@ const validateSeriesId = [
 		.notEmpty()
 		.withMessage('Series ID is required')
 		.custom((value) => {
-			if (!mongoose.Types.ObjectId.isValid(value)) {
-				throw new Error('Invalid series ID');
+			const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+			if (!uuidRegex.test(value)) {
+				throw new Error('Invalid series ID format');
 			}
 			return true;
 		}),

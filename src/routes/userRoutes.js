@@ -1,93 +1,48 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
 const requireAuth = require('../middlewares/requireAuth');
+const userController = require('../controllers/userController');
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
-
-// Initialize Supabase client
-const supabase = createClient(
-	process.env.SUPABASE_URL,
-	process.env.SUPABASE_SERVICE_KEY
-);
 
 // Profile picture upload route
 router.post(
 	'/upload-profile-picture',
 	requireAuth,
 	upload.single('profilePicture'),
-	async (req, res) => {
-		try {
-			if (!req.file) {
-				return res.status(400).json({ message: 'No file uploaded' });
-			}
-
-			const timestamp = new Date().getTime();
-			const fileExtension = req.file.originalname.split('.').pop();
-			const fileName = `profile-pictures/${req.user.id}-${timestamp}.${fileExtension}`;
-
-			// Upload file to Supabase Storage
-			const { data, error } = await supabase.storage
-				.from('user-profileimg')
-				.upload(fileName, req.file.buffer, {
-					contentType: req.file.mimetype,
-					upsert: true,
-				});
-
-			if (error) {
-				throw error;
-			}
-
-			// Get the public URL
-			const {
-				data: { publicUrl },
-			} = supabase.storage.from('user-profileimg').getPublicUrl(fileName);
-
-			// Update user in Supabase
-			const { error: updateError } = await supabase
-				.from('users')
-				.update({ profile_picture: publicUrl })
-				.eq('id', req.user.id);
-
-			if (updateError) {
-				throw updateError;
-			}
-
-			res.status(200).json({
-				message: 'Profile picture uploaded successfully',
-				profilePictureUrl: publicUrl,
-			});
-		} catch (error) {
-			console.error('Error uploading profile picture:', error);
-			res.status(500).json({ message: 'Error uploading profile picture' });
-		}
-	}
+	userController.uploadProfilePicture
 );
 
 // User search route
-router.get('/search', requireAuth, async (req, res) => {
-	const { query } = req.query;
-	if (!query) {
-		return res.status(400).json({ message: 'Search query is required' });
-	}
-	try {
-		const { data: users, error } = await supabase
-			.from('users')
-			.select('id, name, profile_picture')
-			.ilike('name', `${query}%`)
-			.limit(20);
-		if (error) throw error;
-		res.status(200).json(users);
-	} catch (err) {
-		res.status(500).json({ message: 'Error searching users' });
-	}
-});
+router.get('/search', requireAuth, userController.searchUsers);
 
-// You can add other user-related routes here
-// For example:
-// router.get('/profile', authMiddleware, async (req, res) => { ... });
+// Get user profile with activity summary
+router.get('/profile', requireAuth, userController.getUserProfile);
+
+// Get user's prayer requests
+router.get(
+	'/prayer-requests',
+	requireAuth,
+	userController.getUserPrayerRequests
+);
+
+// Get prayer requests user has commented on
+router.get(
+	'/prayer-comments',
+	requireAuth,
+	userController.getUserPrayerComments
+);
+
+// Get events user has attended or registered for
+router.get('/events', requireAuth, userController.getUserEvents);
+
+// Get sermon discussions user has participated in
+router.get(
+	'/sermon-discussions',
+	requireAuth,
+	userController.getUserSermonDiscussions
+);
 
 module.exports = router;

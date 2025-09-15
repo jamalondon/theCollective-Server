@@ -6,7 +6,7 @@ exports.createPrayerRequest = async (req, res) => {
 		const { body, files } = req;
 
 		// Extract and validate text from body
-		let { text } = body;
+		let { text, anonymous } = body;
 		if (typeof text === 'string') {
 			text = text.trim();
 		}
@@ -15,6 +15,9 @@ exports.createPrayerRequest = async (req, res) => {
 				.status(400)
 				.json({ error: 'Prayer request text is required.' });
 		}
+
+		// Parse anonymous flag (default to false if not provided)
+		const isAnonymous = anonymous === 'true' || anonymous === true || false;
 
 		// Upload photos to Supabase Storage
 		let photoUrls = [];
@@ -52,6 +55,7 @@ exports.createPrayerRequest = async (req, res) => {
 			photos: photoUrls,
 			text,
 			title,
+			anonymous: isAnonymous,
 		};
 
 		// Insert into Supabase

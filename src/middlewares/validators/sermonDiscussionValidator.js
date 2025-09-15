@@ -1,6 +1,5 @@
 const { body, param } = require('express-validator');
-const mongoose = require('mongoose');
-const SermonSeries = require('../../models/SermonSeries');
+const supabase = require('../../supabase');
 
 const validateSermonDiscussion = [
 	body('title')
@@ -14,11 +13,20 @@ const validateSermonDiscussion = [
 		.notEmpty()
 		.withMessage('Sermon series ID is required')
 		.custom(async (value) => {
-			if (!mongoose.Types.ObjectId.isValid(value)) {
-				throw new Error('Invalid sermon series ID');
+			// Check if it's a valid UUID format (Supabase uses UUIDs)
+			const uuidRegex =
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+			if (!uuidRegex.test(value)) {
+				throw new Error('Invalid sermon series ID format');
 			}
-			const series = await SermonSeries.findById(value);
-			if (!series) {
+
+			const { data: series, error } = await supabase
+				.from('sermon_series')
+				.select('id, number_of_weeks')
+				.eq('id', value)
+				.single();
+
+			if (error || !series) {
 				throw new Error('Sermon series not found');
 			}
 			return true;
@@ -27,11 +35,18 @@ const validateSermonDiscussion = [
 		.isInt({ min: 1 })
 		.withMessage('Week number must be a positive integer')
 		.custom(async (value, { req }) => {
-			const series = await SermonSeries.findById(req.body.sermonSeries);
-			if (series && value > series.numberOfWeeks) {
-				throw new Error(
-					`Week number cannot exceed the series length of ${series.numberOfWeeks} weeks`
-				);
+			if (req.body.sermonSeries) {
+				const { data: series, error } = await supabase
+					.from('sermon_series')
+					.select('number_of_weeks')
+					.eq('id', req.body.sermonSeries)
+					.single();
+
+				if (!error && series && value > series.number_of_weeks) {
+					throw new Error(
+						`Week number cannot exceed the series length of ${series.number_of_weeks} weeks`
+					);
+				}
 			}
 			return true;
 		}),
@@ -55,8 +70,10 @@ const validateDiscussionId = [
 		.notEmpty()
 		.withMessage('Discussion ID is required')
 		.custom((value) => {
-			if (!mongoose.Types.ObjectId.isValid(value)) {
-				throw new Error('Invalid discussion ID');
+			const uuidRegex =
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+			if (!uuidRegex.test(value)) {
+				throw new Error('Invalid discussion ID format');
 			}
 			return true;
 		}),
@@ -67,8 +84,10 @@ const validateCommentId = [
 		.notEmpty()
 		.withMessage('Comment ID is required')
 		.custom((value) => {
-			if (!mongoose.Types.ObjectId.isValid(value)) {
-				throw new Error('Invalid comment ID');
+			const uuidRegex =
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+			if (!uuidRegex.test(value)) {
+				throw new Error('Invalid comment ID format');
 			}
 			return true;
 		}),

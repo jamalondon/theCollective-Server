@@ -15,10 +15,8 @@ const supabase = require('./supabase');
 
 //libraries
 //express is a web framework for node.js
-//mongoose is an ODM for MongoDB and Node.js
 //body-parser is a middleware to parse incoming request bodies in a middleware before your handlers
 const express = require('express');
-const mongoose = require('mongoose');
 const logger = require('morgan');
 const bodyParser = require('body-parser');
 
