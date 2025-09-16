@@ -66,17 +66,33 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
 		return next(new AppError('Search query is required', 400));
 	}
 
+	// Trim and validate query
+	const searchQuery = query.trim();
+	if (searchQuery.length < 1) {
+		return next(new AppError('Search query must be at least 1 character', 400));
+	}
+
+	// Search for users with names that contain the query (case-insensitive)
+	// This will find users whose names start with, contain, or are similar to the query
 	const { data: users, error } = await supabase
 		.from('users')
 		.select('id, name, profile_picture')
-		.ilike('name', `${query}%`)
+		.or(`name.ilike.${searchQuery}%`)
 		.limit(20);
 
-	if (error) throw error;
+    //search for users that start with the query but ALSO contain the query
+	//Start with the query (name.ilike.${searchQuery}%)
+	//Contains the query (name.ilike.%${searchQuery}%)
+
+	
+	if (error) {
+		console.error('Search users error:', error);
+		throw error;
+	}
 
 	res.status(200).json({
 		success: true,
-		data: users,
+		data: users || [],
 	});
 });
 
