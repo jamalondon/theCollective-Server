@@ -2,3 +2,5 @@
 .env
 .DS_Store
 npm-debug.log
+POSTMAN_SETUP_GUIDE.md
+Postman_Bible_API_Collection.json
