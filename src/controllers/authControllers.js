@@ -43,7 +43,7 @@ exports.signup = async (req, res, next) => {
 		const userData = {
 			username,
 			password: hashedPassword,
-			name,
+			full_name: name,
 			date_of_birth: dateOfBirth,
 			profile_picture: DEFAULT_PROFILE_PICTURE,
 		};
@@ -51,7 +51,7 @@ exports.signup = async (req, res, next) => {
 		// Add phone-related fields only if phone number is provided
 		if (phoneNumber) {
 			userData.phone_number = phoneNumber;
-			userData.phone_verified = false;
+			userData.verified = false;
 		}
 
 		const { data: newUser, error: createError } = await supabase
@@ -71,10 +71,12 @@ exports.signup = async (req, res, next) => {
 				token,
 				userID: newUser.id,
 				username: newUser.username,
-				name: newUser.name,
+				name: newUser.full_name,
 				dateOfBirth: newUser.date_of_birth,
 				profilePicture: newUser.profile_picture,
 				phoneNumber: null,
+				role: newUser.role,
+				verified: true,
 			});
 		}
 
@@ -112,12 +114,12 @@ exports.signupNoPhone = async (req, res, next) => {
 		const userData = {
 			username,
 			password: hashedPassword,
-			name,
+			full_name: name,
 			date_of_birth: dateOfBirth,
 			profile_picture: DEFAULT_PROFILE_PICTURE,
 			// Explicitly set phone fields to null
 			phone_number: null,
-			phone_verified: null,
+			verified: null,
 		};
 
 		const { data: newUser, error: createError } = await supabase
@@ -135,10 +137,12 @@ exports.signupNoPhone = async (req, res, next) => {
 			token,
 			userID: newUser.id,
 			username: newUser.username,
-			name: newUser.name,
+			name: newUser.full_name,
 			dateOfBirth: newUser.date_of_birth,
 			profilePicture: newUser.profile_picture,
 			phoneNumber: null,
+			role: newUser.role,
+			verified: true,
 		});
 	} catch (err) {
 		next(err);
@@ -166,9 +170,11 @@ exports.signin = async (req, res, next) => {
 		if (!isMatch) {
 			return next(new AppError('Invalid username or password', 401));
 		}
+		console.log('user.phone_number', user.phone_number);
+		console.log('user.verified', user.verified);
 
 		// If user has a phone number but it's not verified, ask client to verify via SMS
-		if (user.phone_number && !user.phone_verified) {
+		if (user.phone_number && !user.verified) {
 			return res.status(200).json({
 				verificationRequired: true,
 				username: user.username,
@@ -185,10 +191,12 @@ exports.signin = async (req, res, next) => {
 			token,
 			userID: user.id,
 			username: user.username,
-			name: user.name,
+			name: user.full_name,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,
+			role: user.role,
+			verified: user.verified,
 		});
 	} catch (err) {
 		next(err);
@@ -223,10 +231,12 @@ exports.verifyToken = async (req, res, next) => {
 			token, // Return the same token
 			userID: user.id,
 			username: user.username,
-			name: user.name,
+			name: user.full_name,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,
+			role: user.role,
+			verified: user.verified,
 		});
 	} catch (err) {
 		if (err.name === 'JsonWebTokenError') {
@@ -255,7 +265,7 @@ exports.startVerify = async (req, res, next) => {
 		console.log('Checking user in database...');
 		const { data: user, error: findError } = await supabase
 			.from('users')
-			.select('id, phone_verified')
+			.select('id, verified')
 			.eq('phone_number', phoneNumber)
 			.single();
 
@@ -312,17 +322,20 @@ exports.checkVerify = async (req, res, next) => {
 			return next(new AppError('No user found with this phone number', 404));
 		}
 
-		if (user.phone_verified) {
+		console.log('user.verified', user.verified);
+		if (user.verified) {
 			// Already verified; issue token
 			const token = jwt.sign({ userID: user.id }, process.env.JWT_SECRET);
 			return res.status(200).json({
 				token,
 				userID: user.id,
 				username: user.username,
-				name: user.name,
+				name: user.full_name,
 				dateOfBirth: user.date_of_birth,
 				profilePicture: user.profile_picture,
 				phoneNumber: user.phone_number,
+				role: user.role,
+				verified: user.verified,
 			});
 		}
 
@@ -341,7 +354,7 @@ exports.checkVerify = async (req, res, next) => {
 		const { error: updateError } = await supabase
 			.from('users')
 			.update({
-				phone_verified: true,
+				verified: true,
 			})
 			.eq('id', user.id);
 
@@ -353,10 +366,12 @@ exports.checkVerify = async (req, res, next) => {
 			token,
 			userID: user.id,
 			username: user.username,
-			name: user.name,
+			name: user.full_name,
 			dateOfBirth: user.date_of_birth,
 			profilePicture: user.profile_picture,
 			phoneNumber: user.phone_number,
+			role: user.role,
+			verified: user.verified,
 		});
 	} catch (err) {
 		next(err);

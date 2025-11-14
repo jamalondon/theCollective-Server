@@ -38,8 +38,7 @@ try {
 
 /**
  * Start verification process by sending SMS to phone number
- * @param {string} phoneNumber - Phone number in E.164 format (e.g., +1234567890)
- * @returns {Promise<Object>} - Twilio verification response
+ * Phone number in E.164 format (e.g., +1234567890)
  */
 const startVerification = async (phoneNumber) => {
 	console.log('=== TWILIO START VERIFICATION ===');
@@ -102,9 +101,8 @@ const startVerification = async (phoneNumber) => {
 
 /**
  * Check verification code
- * @param {string} phoneNumber - Phone number in E.164 format
- * @param {string} code - Verification code entered by user
- * @returns {Promise<Object>} - Verification check result
+ * Phone number in E.164 format
+ *  Verification code entered by user
  */
 const checkVerification = async (phoneNumber, code) => {
 	try {

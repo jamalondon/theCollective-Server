@@ -1,4 +1,11 @@
-const supabase = require('../supabase');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
+
+// Initialize Supabase client with service role key to bypass RLS for server operations
+const supabase = createClient(
+	process.env.SUPABASE_URL,
+	process.env.SUPABASE_SERVICE_KEY
+);
 
 exports.createPrayerRequest = async (req, res) => {
 	try {
