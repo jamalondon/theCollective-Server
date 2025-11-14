@@ -37,8 +37,8 @@ const POPULAR_VERSES = [
 	'PSA.37.4',
 ];
 
-// Default Bible ID for English Standard Version
-const DEFAULT_BIBLE_ID = '06125adad2d5898a-01'; // ESV
+// Default Bible ID for World English Bible (public domain, no approval needed)
+const DEFAULT_BIBLE_ID = '9879dbb7cfe39e4d-01'; // WEB (World English Bible)
 
 /**
  * Get verse of the day
@@ -232,8 +232,57 @@ const searchVerses = catchAsync(async (req, res, next) => {
 	}
 });
 
+/**
+ * Test API connection and list available Bibles
+ */
+const testConnection = catchAsync(async (req, res, next) => {
+	try {
+		console.log('Testing Bible API connection...');
+		console.log('API Key present:', !!process.env.BIBLE_API_KEY);
+		console.log('API Key length:', process.env.BIBLE_API_KEY?.length || 0);
+
+		const response = await bibleAPI.get('/bibles');
+
+		console.log('API Response status:', response.status);
+		console.log('Available Bibles count:', response.data?.data?.length || 0);
+
+		res.status(200).json({
+			status: 'success',
+			message: 'Bible API connection successful',
+			data: {
+				availableBibles: response.data?.data?.length || 0,
+				bibles: response.data?.data?.slice(0, 5) || [], // Show first 5 bibles
+				apiKeyConfigured: !!process.env.BIBLE_API_KEY,
+			},
+		});
+	} catch (error) {
+		console.error('Bible API Connection Error:', {
+			status: error.response?.status,
+			statusText: error.response?.statusText,
+			data: error.response?.data,
+			message: error.message,
+		});
+
+		if (error.response?.status === 401) {
+			return next(new AppError('Invalid or missing Bible API key', 401));
+		} else if (error.response?.status === 403) {
+			return next(
+				new AppError(
+					'Bible API key not authorized. Your application may need approval from API.Bible staff.',
+					403
+				)
+			);
+		}
+
+		return next(
+			new AppError(`Bible API connection failed: ${error.message}`, 500)
+		);
+	}
+});
+
 module.exports = {
 	getVerseOfTheDay,
 	getVerse,
 	searchVerses,
+	testConnection,
 };
