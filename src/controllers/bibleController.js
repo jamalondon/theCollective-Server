@@ -237,14 +237,11 @@ const searchVerses = catchAsync(async (req, res, next) => {
  */
 const testConnection = catchAsync(async (req, res, next) => {
 	try {
-		console.log('Testing Bible API connection...');
-		console.log('API Key present:', !!process.env.BIBLE_API_KEY);
-		console.log('API Key length:', process.env.BIBLE_API_KEY?.length || 0);
+		
 
 		const response = await bibleAPI.get('/bibles');
 
-		console.log('API Response status:', response.status);
-		console.log('Available Bibles count:', response.data?.data?.length || 0);
+	
 
 		res.status(200).json({
 			status: 'success',

@@ -46,4 +46,7 @@ router.get(
 	userController.getUserSermonDiscussions
 );
 
+// Get news feed with prayer requests and events
+router.get('/news-feed', requireAuth, userController.getNewsFeed);
+
 module.exports = router;

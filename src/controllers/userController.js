@@ -385,3 +385,57 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 		},
 	});
 });
+
+/**
+ * Get news feed containing all prayer requests and events
+ * Returns a combined feed of recent prayer requests and events
+ */
+exports.getNewsFeed = catchAsync(async (req, res, next) => {
+	const { limit = 20 } = req.query;
+
+	// Fetch prayer requests and events in parallel
+	const [prayerRequestsResponse, eventsResponse] = await Promise.all([
+		supabase
+			.from('prayer_requests')
+			.select('*')
+			.order('created_at', { ascending: false })
+			.limit(limit),
+		supabase
+			.from('events')
+			.select('*')
+			.order('created_at', { ascending: false })
+			.limit(limit),
+	]);
+
+	// Check for errors
+	if (prayerRequestsResponse.error) throw prayerRequestsResponse.error;
+	if (eventsResponse.error) throw eventsResponse.error;
+
+	// Add type identifier to each item and combine
+	const prayerRequests = (prayerRequestsResponse.data || []).map((item) => ({
+		...item,
+		type: 'prayer_request',
+	}));
+
+	const events = (eventsResponse.data || []).map((item) => ({
+		...item,
+		type: 'event',
+	}));
+
+	// Combine and sort by creation date
+	const newsFeed = [...prayerRequests, ...events].sort(
+		(a, b) => new Date(b.created_at) - new Date(a.created_at)
+	);
+
+	res.status(200).json({
+		success: true,
+		data: {
+			feed: newsFeed,
+			counts: {
+				prayerRequests: prayerRequests.length,
+				events: events.length,
+				total: newsFeed.length,
+			},
+		},
+	});
+});
