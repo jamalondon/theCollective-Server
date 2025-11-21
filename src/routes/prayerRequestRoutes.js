@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const prayerRequestController = require('../controllers/prayerRequestController');
 const requireAuth = require('../middlewares/requireAuth');
+const prayerTitleModifier = require('../middlewares/prayerTitleModifier');
 
 // Set up multer for file uploads (memory storage for direct upload to Supabase)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -11,7 +12,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.post(
 	'/',
 	requireAuth,
-	upload.array('photos', 5), // up to 5 photos per request
+	upload.array('images', 5), // up to 5 images per request
+	prayerTitleModifier,
 	prayerRequestController.createPrayerRequest
 );
 

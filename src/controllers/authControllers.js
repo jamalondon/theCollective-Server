@@ -170,8 +170,6 @@ exports.signin = async (req, res, next) => {
 		if (!isMatch) {
 			return next(new AppError('Invalid username or password', 401));
 		}
-		console.log('user.phone_number', user.phone_number);
-		console.log('user.verified', user.verified);
 
 		// If user has a phone number but it's not verified, ask client to verify via SMS
 		if (user.phone_number && !user.verified) {
@@ -257,51 +255,41 @@ exports.startVerify = async (req, res, next) => {
 	try {
 		// Validate phone number exists
 		if (!phoneNumber) {
-			console.log('ERROR: No phone number provided');
 			return next(new AppError('Phone number is required', 400));
 		}
 
 		// Check if user exists with this phone number
-		console.log('Checking user in database...');
 		const { data: user, error: findError } = await supabase
 			.from('users')
 			.select('id, verified')
 			.eq('phone_number', phoneNumber)
 			.single();
 
-		console.log('Database query result:', { user, findError });
 
 		if (findError || !user) {
-			console.log('ERROR: User not found with phone number:', phoneNumber);
 			return next(new AppError('No user found with this phone number', 404));
 		}
 
 		if (user.phone_verified) {
-			console.log('Phone already verified for user:', user.id);
 			return res.status(200).json({ message: 'Phone number already verified' });
 		}
 
 		// Start Twilio verification
-		console.log('Starting Twilio verification for:', phoneNumber);
 		const verificationResult = await startVerification(phoneNumber);
-		console.log('Twilio verification result:', verificationResult);
 
 		if (!verificationResult || !verificationResult.success) {
 			const errorMessage =
 				verificationResult?.error || 'Unknown error occurred';
-			console.log('ERROR: Twilio verification failed:', errorMessage);
 			return next(
 				new AppError(`Failed to send verification code: ${errorMessage}`, 500)
 			);
 		}
 
-		console.log('SUCCESS: Verification code sent');
 		res.status(200).json({
 			message: 'Verification code sent to your phone number',
 			status: verificationResult.status,
 		});
 	} catch (err) {
-		console.log('CATCH ERROR in startVerify:', err);
 		next(err);
 	}
 };
@@ -322,7 +310,6 @@ exports.checkVerify = async (req, res, next) => {
 			return next(new AppError('No user found with this phone number', 404));
 		}
 
-		console.log('user.verified', user.verified);
 		if (user.verified) {
 			// Already verified; issue token
 			const token = jwt.sign({ userID: user.id }, process.env.JWT_SECRET);
