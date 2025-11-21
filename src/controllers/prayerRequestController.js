@@ -1,17 +1,10 @@
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
-
-// Initialize Supabase client with service role key to bypass RLS for server operations
-const supabase = createClient(
-	process.env.SUPABASE_URL,
-	process.env.SUPABASE_SERVICE_KEY
-);
+const supabase = require('../supabase');
 
 exports.createPrayerRequest = async (req, res) => {
 	try {
 		const user = req.user; // from requireAuth middleware
-		const { body, files } = req;
-
+		const { body } = req;
+		console.log(body);
 		// Extract and validate text from body
 		let { text, anonymous } = body;
 		if (typeof text === 'string') {
@@ -26,36 +19,51 @@ exports.createPrayerRequest = async (req, res) => {
 		// Parse anonymous flag (default to false if not provided)
 		const isAnonymous = anonymous === 'true' || anonymous === true || false;
 
-		// Upload photos to Supabase Storage
-		let photoUrls = [];
-		if (files && files.length > 0) {
-			for (const file of files) {
-				const filePath = `prayer-requests/${user.id}/${Date.now()}_${
-					file.originalname
-				}`;
-				const { data, error } = await supabase.storage
-					.from('prayer-media')
-					.upload(filePath, file.buffer, {
-						contentType: file.mimetype,
-						upsert: false,
-					});
-				if (error) throw error;
-				const { publicUrl } = supabase.storage
-					.from('prayer-media')
-					.getPublicUrl(filePath).data;
-				photoUrls.push(publicUrl);
+	// Upload photos to Supabase Storage
+	let photoUrls = [];
+	const files = req.files;
+	
+	// Only process files if they exist and are in an array with items
+	if (files && Array.isArray(files) && files.length > 0) {
+		console.log(`Uploading ${files.length} files to Supabase...`);
+		for (const file of files) {
+			const filePath = `prayer-requests/${user.id}/${Date.now()}_${
+				file.originalname
+			}`;
+			console.log(`Uploading file to path: ${filePath}`);
+			console.log(`File size: ${file.size} bytes, mimetype: ${file.mimetype}`);
+			
+			const { data, error } = await supabase.storage
+				.from('prayer-media')
+				.upload(filePath, file.buffer, {
+					contentType: file.mimetype,
+					upsert: false,
+				});
+			
+			if (error) {
+				console.error('Supabase storage upload error:', error);
+				throw error;
 			}
+			
+			console.log('Upload successful, data:', data);
+			const { data: urlData } = supabase.storage
+				.from('prayer-media')
+				.getPublicUrl(filePath);
+			const publicUrl = urlData.publicUrl;
+			console.log('Public URL:', publicUrl);
+			photoUrls.push(publicUrl);
 		}
+	}
 
 		const title = req.body.title
 			? req.body.title.trim()
-			: 'Pray for ' + user.name;
+			: 'Pray for ' + user.full_name;
 
 		// Prepare prayer request object
 		const prayerRequest = {
 			owner: {
 				id: user.id,
-				name: user.name,
+				name: user.full_name,
 				profile_picture: user.profile_picture,
 			},
 			comments: [],

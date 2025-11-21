@@ -49,4 +49,55 @@ router.get(
 // Get news feed with prayer requests and events
 router.get('/news-feed', requireAuth, userController.getNewsFeed);
 
+// Send a friend request
+router.post('/friends/request', requireAuth, userController.sendFriendRequest);
+
+// Accept a friend request
+router.patch(
+	'/friends/request/:friendshipId/accept',
+	requireAuth,
+	userController.acceptFriendRequest
+);
+
+// Reject a friend request
+router.patch(
+	'/friends/request/:friendshipId/reject',
+	requireAuth,
+	userController.rejectFriendRequest
+);
+
+// Cancel a pending friend request
+router.delete(
+	'/friends/request/:friendshipId/cancel',
+	requireAuth,
+	userController.cancelFriendRequest
+);
+
+// Remove a friend (unfriend)
+router.delete('/friends/:userId', requireAuth, userController.removeFriend);
+
+// Get user's friends list
+router.get('/friends', requireAuth, userController.getFriends);
+
+// Get pending friend requests (received)
+router.get(
+	'/friends/requests/pending',
+	requireAuth,
+	userController.getPendingFriendRequests
+);
+
+// Get sent friend requests
+router.get(
+	'/friends/requests/sent',
+	requireAuth,
+	userController.getSentFriendRequests
+);
+
+// Get friendship status with a specific user
+router.get(
+	'/friends/status/:userId',
+	requireAuth,
+	userController.getFriendshipStatus
+);
+
 module.exports = router;
