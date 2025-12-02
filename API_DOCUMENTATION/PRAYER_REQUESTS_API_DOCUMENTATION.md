@@ -20,7 +20,7 @@ Authorization: Bearer <your-jwt-token>
 
 ## 1. Create Prayer Request
 
-**POST** `/`
+**POST** `/API/v1/prayer-requests`
 
 Create a new prayer request with optional photos.
 
@@ -44,22 +44,11 @@ fetch('/API/v1/prayer-requests', {
 });
 ```
 
-### cURL Example
 
-```bash
-curl -X POST \
-  http://localhost:3000/API/v1/prayer-requests \
-  -H "Authorization: Bearer your-jwt-token" \
-  -F "text=Please pray for my family during this difficult time" \
-  -F "title=Prayer for Family" \
-  -F "anonymous=false" \
-  -F "photos=@/path/to/image1.jpg" \
-  -F "photos=@/path/to/image2.jpg"
-```
 
 ### Request Body (FormData)
 
-- `text` (string, required): Prayer request text content
+- `text` (string, required): Prayer request text
 - `title` (string, optional): Custom title (defaults to "Pray for [user name]")
 - `anonymous` (string, optional): "true" or "false" (defaults to false)
 - `photos` (file, optional): Up to 5 image files
@@ -93,25 +82,9 @@ curl -X POST \
 
 ## 2. Get All Prayer Requests
 
-**GET** `/`
+**GET** `/API/v1/prayer-requests`
 
 Get all prayer requests (no authentication required).
-
-### Request
-
-```javascript
-// Using fetch API
-fetch('/API/v1/prayer-requests', {
-	method: 'GET',
-});
-```
-
-### cURL Example
-
-```bash
-curl -X GET \
-  http://localhost:3000/API/v1/prayer-requests
-```
 
 ### Response
 
@@ -166,29 +139,9 @@ curl -X GET \
 
 ## 3. Delete Prayer Request
 
-**DELETE** `/:id`
+**DELETE** `/API/v1/prayer-requests/prayer-request-id`
 
 Delete a prayer request (only the owner can delete).
-
-### Request
-
-```javascript
-// Using fetch API
-fetch('/API/v1/prayer-requests/prayer-request-id', {
-	method: 'DELETE',
-	headers: {
-		'Authorization': 'Bearer your-jwt-token',
-	},
-});
-```
-
-### cURL Example
-
-```bash
-curl -X DELETE \
-  http://localhost:3000/API/v1/prayer-requests/prayer-request-id \
-  -H "Authorization: Bearer your-jwt-token"
-```
 
 ### Response
 
@@ -212,6 +165,12 @@ All routes may return these error responses:
 }
 ```
 
+```json
+{
+	"error": "Comment text is required."
+}
+```
+
 ### 401 Unauthorized
 
 ```json
@@ -225,6 +184,18 @@ All routes may return these error responses:
 ```json
 {
 	"error": "You can only delete your own prayer requests"
+}
+```
+
+```json
+{
+	"error": "You can only edit your own comments"
+}
+```
+
+```json
+{
+	"error": "You can only delete your own comments or comments on your prayer requests"
 }
 ```
 
@@ -356,6 +327,108 @@ function createAnonymousPrayerRequest() {
 		console.error('Failed to create anonymous prayer request:', error);
 	});
 }
+
+// =====================================================
+// Comment Management Functions
+// =====================================================
+
+// Add a comment to a prayer request
+async function addComment(prayerRequestId, text) {
+	try {
+		const response = await fetch(`/API/v1/prayer-requests/${prayerRequestId}/comments`, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ text }),
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comment added:', data);
+		return data;
+	} catch (error) {
+		console.error('Error adding comment:', error);
+		throw error;
+	}
+}
+
+// Get all comments for a prayer request
+async function getComments(prayerRequestId) {
+	try {
+		const response = await fetch(`/API/v1/prayer-requests/${prayerRequestId}/comments`, {
+			method: 'GET',
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comments:', data);
+		return data;
+	} catch (error) {
+		console.error('Error fetching comments:', error);
+		throw error;
+	}
+}
+
+// Update a comment
+async function updateComment(prayerRequestId, commentId, text) {
+	try {
+		const response = await fetch(`/API/v1/prayer-requests/${prayerRequestId}/comments/${commentId}`, {
+			method: 'PUT',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ text }),
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comment updated:', data);
+		return data;
+	} catch (error) {
+		console.error('Error updating comment:', error);
+		throw error;
+	}
+}
+
+// Delete a comment
+async function deleteComment(prayerRequestId, commentId) {
+	try {
+		const response = await fetch(`/API/v1/prayer-requests/${prayerRequestId}/comments/${commentId}`, {
+			method: 'DELETE',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comment deleted:', data);
+		return data;
+	} catch (error) {
+		console.error('Error deleting comment:', error);
+		throw error;
+	}
+}
+
+// Example usage: Add a comment
+addComment('prayer-request-uuid', 'Praying for you! 🙏')
+	.then(result => console.log('Success:', result))
+	.catch(error => console.error('Failed:', error));
 ```
 
 ---
@@ -387,9 +460,190 @@ interface PrayerRequest {
 ```typescript
 interface Comment {
 	id: string;
+	prayer_request_id: string;
 	user_id: string;
-	comment: string;
+	text: string;
 	created_at: string;
+	updated_at: string;
+	user: {
+		id: string;
+		name: string;
+		profile_picture: string;
+	};
+}
+```
+
+---
+
+## 4. Add Comment to Prayer Request
+
+**POST** `/:id/comments`
+
+Add a comment to a prayer request (authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments', {
+	method: 'POST',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+		'Content-Type': 'application/json',
+	},
+	body: JSON.stringify({
+		text: 'Praying for you and your family!',
+	}),
+});
+```
+
+
+### Response (201 Created)
+
+```json
+{
+	"comment": {
+		"id": "comment-uuid",
+		"prayer_request_id": "prayer-request-uuid",
+		"user_id": "user-uuid",
+		"text": "Praying for you and your family!",
+		"created_at": "2024-01-01T12:00:00.000Z",
+		"updated_at": "2024-01-01T12:00:00.000Z",
+		"user": {
+			"id": "user-uuid",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		}
+	}
+}
+```
+
+---
+
+## 5. Get Comments for Prayer Request
+
+**GET** `/:id/comments`
+
+Get all comments for a specific prayer request (no authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments', {
+	method: 'GET',
+});
+```
+
+
+### Response (200 OK)
+
+```json
+{
+	"total": 3,
+	"comments": [
+		{
+			"id": "comment-uuid-1",
+			"prayer_request_id": "prayer-request-uuid",
+			"user_id": "user-uuid-1",
+			"text": "Praying for you and your family!",
+			"created_at": "2024-01-01T12:00:00.000Z",
+			"updated_at": "2024-01-01T12:00:00.000Z",
+			"user": {
+				"id": "user-uuid-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile1.jpg"
+			}
+		},
+		{
+			"id": "comment-uuid-2",
+			"prayer_request_id": "prayer-request-uuid",
+			"user_id": "user-uuid-2",
+			"text": "Lifting you up in prayer 🙏",
+			"created_at": "2024-01-01T13:00:00.000Z",
+			"updated_at": "2024-01-01T13:00:00.000Z",
+			"user": {
+				"id": "user-uuid-2",
+				"name": "Jane Smith",
+				"profile_picture": "https://example.com/profile2.jpg"
+			}
+		}
+	]
+}
+```
+
+---
+
+## 6. Update Comment
+
+**PUT** `/:id/comments/:commentId`
+
+Update a comment (only the comment owner can update).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id', {
+	method: 'PUT',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+		'Content-Type': 'application/json',
+	},
+	body: JSON.stringify({
+		text: 'Updated comment text',
+	}),
+});
+```
+
+
+
+### Response (200 OK)
+
+```json
+{
+	"comment": {
+		"id": "comment-uuid",
+		"prayer_request_id": "prayer-request-uuid",
+		"user_id": "user-uuid",
+		"text": "Updated comment text",
+		"created_at": "2024-01-01T12:00:00.000Z",
+		"updated_at": "2024-01-01T14:00:00.000Z",
+		"user": {
+			"id": "user-uuid",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		}
+	}
+}
+```
+
+---
+
+## 7. Delete Comment
+
+**DELETE** `/:id/comments/:commentId`
+
+Delete a comment (comment owner or prayer request owner can delete).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+
+### Response (200 OK)
+
+```json
+{
+	"message": "Comment deleted successfully"
 }
 ```
 

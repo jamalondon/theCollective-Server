@@ -1,6 +1,7 @@
 //ENV variables
 const dotenv = require('dotenv');
 dotenv.config({ path: './.env' });
+
 // Load environment variables based on NODE_ENV
 if (process.env.NODE_ENV === 'production') {
 	dotenv.config({ path: '.env.production' });
@@ -8,10 +9,22 @@ if (process.env.NODE_ENV === 'production') {
 	dotenv.config({ path: '.env.development' });
 }
 
-console.log(`Connected to ${process.env.NODE_ENV} environment`);
-
 // Initialize Supabase client
 const supabase = require('./supabase');
+
+// variable to test Supabase connection
+const testSupabaseConnection = async () => {
+	try {
+		const { data, error } = await supabase.auth.getSession();
+		if (error) throw error;
+		console.log('Successfully connected to Supabase');
+	} catch (err) {
+		console.error('Error connecting to Supabase:', err.message);
+	}
+};
+
+//test the Supabase connection
+testSupabaseConnection();
 
 //libraries
 //express is a web framework for node.js
@@ -62,19 +75,7 @@ app.use('/API/v1/bible', bibleRoutes);
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// variable to test Supabase connection
-const testSupabaseConnection = async () => {
-	try {
-		const { data, error } = await supabase.auth.getSession();
-		if (error) throw error;
-		console.log('Successfully connected to Supabase');
-	} catch (err) {
-		console.error('Error connecting to Supabase:', err.message);
-	}
-};
 
-//test the Supabase connection
-testSupabaseConnection();
 
 //main route handler
 app.get('/', requireAuth, (req, res) => {

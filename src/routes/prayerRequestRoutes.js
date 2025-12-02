@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const prayerRequestController = require('../controllers/prayerRequestController');
 const requireAuth = require('../middlewares/requireAuth');
-const prayerTitleModifier = require('../middlewares/prayerTitleModifier');
+const prayerRequestModifier = require('../middlewares/prayerRequestModifier');
 
 // Set up multer for file uploads (memory storage for direct upload to Supabase)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -13,7 +13,7 @@ router.post(
 	'/',
 	requireAuth,
 	upload.array('images', 5), // up to 5 images per request
-	prayerTitleModifier,
+	prayerRequestModifier,
 	prayerRequestController.createPrayerRequest
 );
 
@@ -22,5 +22,27 @@ router.get('/', prayerRequestController.getPrayerRequests);
 
 // DELETE /API/v1/prayer-request/:id
 router.delete('/:id', requireAuth, prayerRequestController.deletePrayerRequest);
+
+// Comment Routes //
+
+// POST /API/v1/prayer-requests/:id/comments - Add a comment
+router.post('/:id/comments', requireAuth, prayerRequestController.addComment);
+
+// GET /API/v1/prayer-requests/:id/comments - Get all comments for a prayer request
+router.get('/:id/comments', prayerRequestController.getComments);
+
+// PUT /API/v1/prayer-requests/:id/comments/:commentId - Update a comment
+router.put(
+	'/:id/comments/:commentId',
+	requireAuth,
+	prayerRequestController.updateComment
+);
+
+// DELETE /API/v1/prayer-requests/:id/comments/:commentId - Delete a comment
+router.delete(
+	'/:id/comments/:commentId',
+	requireAuth,
+	prayerRequestController.deleteComment
+);
 
 module.exports = router;
