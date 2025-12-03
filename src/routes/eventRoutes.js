@@ -37,4 +37,40 @@ router.post('/:id/cancel', eventController.cancelAttendance);
 // Delete an event (only the owner can delete)
 router.delete('/:id', eventController.deleteEvent);
 
+// Event Comment Routes //
+
+// Add a comment to an event
+router.post('/:id/comments', eventController.addComment);
+
+// Get all comments for an event
+router.get('/:id/comments', eventController.getComments);
+
+// Update a comment
+router.put('/:id/comments/:commentId', eventController.updateComment);
+
+// Delete a comment
+router.delete('/:id/comments/:commentId', eventController.deleteComment);
+
+// Event Like Routes //
+
+// Like an event
+router.post('/:id/like', eventController.likeEvent);
+
+// Unlike an event
+router.delete('/:id/like', eventController.unlikeEvent);
+
+// Get likes for an event
+router.get('/:id/likes', eventController.getEventLikes);
+
+// Event Comment Like Routes //
+
+// Like a comment
+router.post('/:id/comments/:commentId/like', eventController.likeComment);
+
+// Unlike a comment
+router.delete('/:id/comments/:commentId/like', eventController.unlikeComment);
+
+// Get likes for a comment
+router.get('/:id/comments/:commentId/likes', eventController.getCommentLikes);
+
 module.exports = router;

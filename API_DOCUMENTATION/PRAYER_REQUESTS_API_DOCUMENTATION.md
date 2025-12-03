@@ -649,6 +649,242 @@ fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id', {
 
 ---
 
+## 8. Like a Prayer Request
+
+**POST** `/:id/like`
+
+Like a prayer request (authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/like', {
+	method: 'POST',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### Response (201 Created)
+
+```json
+{
+	"message": "Prayer request liked successfully",
+	"like": {
+		"id": "like-uuid",
+		"prayer_request_id": "prayer-request-uuid",
+		"user": {
+			"id": "user-uuid",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"created_at": "2024-01-01T12:00:00.000Z"
+	},
+	"likeCount": 5
+}
+```
+
+### Error Response (400 Bad Request)
+
+```json
+{
+	"error": "You have already liked this prayer request"
+}
+```
+
+---
+
+## 9. Unlike a Prayer Request
+
+**DELETE** `/:id/like`
+
+Remove your like from a prayer request (authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/like', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### Response (200 OK)
+
+```json
+{
+	"message": "Prayer request unliked successfully",
+	"likeCount": 4
+}
+```
+
+---
+
+## 10. Get Prayer Request Likes
+
+**GET** `/:id/likes`
+
+Get all users who liked a prayer request (no authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/likes', {
+	method: 'GET',
+});
+```
+
+### Response (200 OK)
+
+```json
+{
+	"total": 3,
+	"likes": [
+		{
+			"id": "like-uuid-1",
+			"prayer_request_id": "prayer-request-uuid",
+			"user": {
+				"id": "user-uuid-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile1.jpg"
+			},
+			"created_at": "2024-01-01T12:00:00.000Z"
+		},
+		{
+			"id": "like-uuid-2",
+			"prayer_request_id": "prayer-request-uuid",
+			"user": {
+				"id": "user-uuid-2",
+				"name": "Jane Smith",
+				"profile_picture": "https://example.com/profile2.jpg"
+			},
+			"created_at": "2024-01-01T11:00:00.000Z"
+		}
+	]
+}
+```
+
+---
+
+## 11. Like a Comment
+
+**POST** `/:id/comments/:commentId/like`
+
+Like a comment (authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id/like', {
+	method: 'POST',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### Response (201 Created)
+
+```json
+{
+	"message": "Comment liked successfully",
+	"like": {
+		"id": "like-uuid",
+		"comment_id": "comment-uuid",
+		"user": {
+			"id": "user-uuid",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"created_at": "2024-01-01T12:00:00.000Z"
+	},
+	"likeCount": 3
+}
+```
+
+### Error Response (400 Bad Request)
+
+```json
+{
+	"error": "You have already liked this comment"
+}
+```
+
+---
+
+## 12. Unlike a Comment
+
+**DELETE** `/:id/comments/:commentId/like`
+
+Remove your like from a comment (authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id/like', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### Response (200 OK)
+
+```json
+{
+	"message": "Comment unliked successfully",
+	"likeCount": 2
+}
+```
+
+---
+
+## 13. Get Comment Likes
+
+**GET** `/:id/comments/:commentId/likes`
+
+Get all users who liked a comment (no authentication required).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/prayer-requests/prayer-request-id/comments/comment-id/likes', {
+	method: 'GET',
+});
+```
+
+### Response (200 OK)
+
+```json
+{
+	"total": 2,
+	"likes": [
+		{
+			"id": "like-uuid-1",
+			"comment_id": "comment-uuid",
+			"user": {
+				"id": "user-uuid-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile1.jpg"
+			},
+			"created_at": "2024-01-01T12:00:00.000Z"
+		}
+	]
+}
+```
+
+---
+
 ## File Upload Guidelines
 
 - **Maximum files**: 5 photos per prayer request

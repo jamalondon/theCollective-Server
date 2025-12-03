@@ -67,8 +67,10 @@ const prayerRequestModifier = async (req, res, next) => {
 		console.error('Error generating prayer title:', error.message);
 		// If LM API fails, just continue with a default title "Pray for [user name]"
 		// only if anonymous is false
-		if (!req.body.anonymous) {
-			req.body.title = 'Prayers needed for ' + req.user.full_name;
+		if (!req.body.anonymous || req.body.anonymous === 'false') {
+			//only use the users first name for the title
+			const firstName = req.user.full_name.split(' ')[0];
+			req.body.title = 'Prayers needed for ' + firstName;
 		} else {
 			req.body.title = 'Prayers needed';
 		}

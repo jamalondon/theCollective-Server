@@ -77,15 +77,12 @@ curl -X POST \
 	"description": "Weekly worship service",
 	"location": "Main Sanctuary",
 	"date": "2024-01-07T10:00:00.000Z",
-	"owner_id": "user-id",
 	"tags": ["worship", "service"],
 	"created_at": "2024-01-01T00:00:00.000Z",
 	"updated_at": "2024-01-01T00:00:00.000Z",
 	"owner": {
 		"id": "user-id",
 		"name": "John Doe",
-		"username": "johndoe",
-		"email": "john@example.com",
 		"profile_picture": "https://example.com/profile.jpg"
 	},
 	"attendees": [
@@ -138,15 +135,12 @@ curl -X GET \
 		"description": "Weekly worship service",
 		"location": "Main Sanctuary",
 		"date": "2024-01-07T10:00:00.000Z",
-		"owner_id": "user-id",
 		"tags": ["worship", "service"],
 		"created_at": "2024-01-01T00:00:00.000Z",
 		"updated_at": "2024-01-01T00:00:00.000Z",
 		"owner": {
 			"id": "user-id",
 			"name": "John Doe",
-			"username": "johndoe",
-			"email": "john@example.com",
 			"profile_picture": "https://example.com/profile.jpg"
 		}
 	}
@@ -191,15 +185,12 @@ curl -X GET \
 		"description": "Weekly worship service",
 		"location": "Main Sanctuary",
 		"date": "2024-01-07T10:00:00.000Z",
-		"owner_id": "user-id",
 		"tags": ["worship", "service"],
 		"created_at": "2024-01-01T00:00:00.000Z",
 		"updated_at": "2024-01-01T00:00:00.000Z",
 		"owner": {
 			"id": "user-id",
 			"name": "John Doe",
-			"username": "johndoe",
-			"email": "john@example.com",
 			"profile_picture": "https://example.com/profile.jpg"
 		}
 	}
@@ -244,15 +235,12 @@ curl -X GET \
 		"description": "Weekly bible study group",
 		"location": "Room 101",
 		"date": "2024-01-08T19:00:00.000Z",
-		"owner_id": "other-user-id",
 		"tags": ["study", "bible"],
 		"created_at": "2024-01-01T00:00:00.000Z",
 		"updated_at": "2024-01-01T00:00:00.000Z",
 		"owner": {
 			"id": "other-user-id",
 			"name": "Jane Smith",
-			"username": "janesmith",
-			"email": "jane@example.com",
 			"profile_picture": "https://example.com/jane.jpg"
 		}
 	}
@@ -335,15 +323,12 @@ curl -X GET \
 	"description": "Weekly worship service",
 	"location": "Main Sanctuary",
 	"date": "2024-01-07T10:00:00.000Z",
-	"owner_id": "user-id",
 	"tags": ["worship", "service"],
 	"created_at": "2024-01-01T00:00:00.000Z",
 	"updated_at": "2024-01-01T00:00:00.000Z",
 	"owner": {
 		"id": "user-id",
 		"name": "John Doe",
-		"username": "johndoe",
-		"email": "john@example.com",
 		"profile_picture": "https://example.com/profile.jpg"
 	},
 	"attendees": [
@@ -423,15 +408,12 @@ curl -X PUT \
 	"description": "Updated description",
 	"location": "Main Sanctuary",
 	"date": "2024-01-07T10:00:00.000Z",
-	"owner_id": "user-id",
 	"tags": ["worship", "service"],
 	"created_at": "2024-01-01T00:00:00.000Z",
 	"updated_at": "2024-01-01T00:00:00.000Z",
 	"owner": {
 		"id": "user-id",
 		"name": "John Doe",
-		"username": "johndoe",
-		"email": "john@example.com",
 		"profile_picture": "https://example.com/profile.jpg"
 	},
 	"attendees": [
@@ -709,6 +691,637 @@ async function updateEvent(eventId, updateData) {
 		return data;
 	} catch (error) {
 		console.error('Error updating event:', error);
+		throw error;
+	}
+}
+```
+
+---
+
+# Event Comments API
+
+## 11. Add Comment to Event
+
+**POST** `/:id/comments`
+
+Add a comment to an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments', {
+	method: 'POST',
+	headers: {
+		'Content-Type': 'application/json',
+		'Authorization': 'Bearer your-jwt-token',
+	},
+	body: JSON.stringify({
+		text: 'Looking forward to this event!'
+	}),
+});
+```
+
+### cURL Example
+
+```bash
+curl -X POST \
+  http://localhost:3000/API/v1/events/event-id/comments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -d '{
+    "text": "Looking forward to this event!"
+  }'
+```
+
+### Request Body
+
+- `text` (string, required): Comment text
+
+### Response
+
+```json
+{
+	"comment": {
+		"id": "comment-id",
+		"event_id": "event-id",
+		"user": {
+			"id": "user-id",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"text": "Looking forward to this event!",
+		"created_at": "2024-01-01T00:00:00.000Z",
+		"updated_at": "2024-01-01T00:00:00.000Z"
+	}
+}
+```
+
+---
+
+## 12. Get Comments for Event
+
+**GET** `/:id/comments`
+
+Get all comments for an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments', {
+	method: 'GET',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X GET \
+  http://localhost:3000/API/v1/events/event-id/comments \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"total": 2,
+	"comments": [
+		{
+			"id": "comment-id-1",
+			"event_id": "event-id",
+			"user": {
+				"id": "user-id-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile.jpg"
+			},
+			"text": "Looking forward to this event!",
+			"created_at": "2024-01-01T00:00:00.000Z",
+			"updated_at": "2024-01-01T00:00:00.000Z"
+		},
+		{
+			"id": "comment-id-2",
+			"event_id": "event-id",
+			"user": {
+				"id": "user-id-2",
+				"name": "Jane Smith",
+				"profile_picture": "https://example.com/jane.jpg"
+			},
+			"text": "Can't wait!",
+			"created_at": "2024-01-01T01:00:00.000Z",
+			"updated_at": "2024-01-01T01:00:00.000Z"
+		}
+	]
+}
+```
+
+---
+
+## 13. Update Comment
+
+**PUT** `/:id/comments/:commentId`
+
+Update a comment (only the comment owner can update).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments/comment-id', {
+	method: 'PUT',
+	headers: {
+		'Content-Type': 'application/json',
+		'Authorization': 'Bearer your-jwt-token',
+	},
+	body: JSON.stringify({
+		text: 'Updated comment text'
+	}),
+});
+```
+
+### cURL Example
+
+```bash
+curl -X PUT \
+  http://localhost:3000/API/v1/events/event-id/comments/comment-id \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-jwt-token" \
+  -d '{
+    "text": "Updated comment text"
+  }'
+```
+
+### Request Body
+
+- `text` (string, required): Updated comment text
+
+### Response
+
+```json
+{
+	"comment": {
+		"id": "comment-id",
+		"event_id": "event-id",
+		"user": {
+			"id": "user-id",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"text": "Updated comment text",
+		"created_at": "2024-01-01T00:00:00.000Z",
+		"updated_at": "2024-01-01T02:00:00.000Z"
+	}
+}
+```
+
+---
+
+## 14. Delete Comment
+
+**DELETE** `/:id/comments/:commentId`
+
+Delete a comment (comment owner or event owner can delete).
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments/comment-id', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X DELETE \
+  http://localhost:3000/API/v1/events/event-id/comments/comment-id \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"message": "Comment deleted successfully"
+}
+```
+
+---
+
+# Event Likes API
+
+## 15. Like Event
+
+**POST** `/:id/like`
+
+Like an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/like', {
+	method: 'POST',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X POST \
+  http://localhost:3000/API/v1/events/event-id/like \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"message": "Event liked successfully",
+	"like": {
+		"id": "like-id",
+		"event_id": "event-id",
+		"user": {
+			"id": "user-id",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"created_at": "2024-01-01T00:00:00.000Z"
+	},
+	"likeCount": 1
+}
+```
+
+---
+
+## 16. Unlike Event
+
+**DELETE** `/:id/like`
+
+Remove like from an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/like', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X DELETE \
+  http://localhost:3000/API/v1/events/event-id/like \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"message": "Event unliked successfully",
+	"likeCount": 0
+}
+```
+
+---
+
+## 17. Get Event Likes
+
+**GET** `/:id/likes`
+
+Get all likes for an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/likes', {
+	method: 'GET',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X GET \
+  http://localhost:3000/API/v1/events/event-id/likes \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"total": 2,
+	"likes": [
+		{
+			"id": "like-id-1",
+			"event_id": "event-id",
+			"user": {
+				"id": "user-id-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile.jpg"
+			},
+			"created_at": "2024-01-01T00:00:00.000Z"
+		},
+		{
+			"id": "like-id-2",
+			"event_id": "event-id",
+			"user": {
+				"id": "user-id-2",
+				"name": "Jane Smith",
+				"profile_picture": "https://example.com/jane.jpg"
+			},
+			"created_at": "2024-01-01T01:00:00.000Z"
+		}
+	]
+}
+```
+
+---
+
+# Event Comment Likes API
+
+## 18. Like Comment
+
+**POST** `/:id/comments/:commentId/like`
+
+Like a comment on an event.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments/comment-id/like', {
+	method: 'POST',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X POST \
+  http://localhost:3000/API/v1/events/event-id/comments/comment-id/like \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"message": "Comment liked successfully",
+	"like": {
+		"id": "like-id",
+		"comment_id": "comment-id",
+		"user": {
+			"id": "user-id",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile.jpg"
+		},
+		"created_at": "2024-01-01T00:00:00.000Z"
+	},
+	"likeCount": 1
+}
+```
+
+---
+
+## 19. Unlike Comment
+
+**DELETE** `/:id/comments/:commentId/like`
+
+Remove like from a comment.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments/comment-id/like', {
+	method: 'DELETE',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X DELETE \
+  http://localhost:3000/API/v1/events/event-id/comments/comment-id/like \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"message": "Comment unliked successfully",
+	"likeCount": 0
+}
+```
+
+---
+
+## 20. Get Comment Likes
+
+**GET** `/:id/comments/:commentId/likes`
+
+Get all likes for a comment.
+
+### Request
+
+```javascript
+// Using fetch API
+fetch('/API/v1/events/event-id/comments/comment-id/likes', {
+	method: 'GET',
+	headers: {
+		'Authorization': 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X GET \
+  http://localhost:3000/API/v1/events/event-id/comments/comment-id/likes \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Response
+
+```json
+{
+	"total": 2,
+	"likes": [
+		{
+			"id": "like-id-1",
+			"comment_id": "comment-id",
+			"user": {
+				"id": "user-id-1",
+				"name": "John Doe",
+				"profile_picture": "https://example.com/profile.jpg"
+			},
+			"created_at": "2024-01-01T00:00:00.000Z"
+		},
+		{
+			"id": "like-id-2",
+			"comment_id": "comment-id",
+			"user": {
+				"id": "user-id-2",
+				"name": "Jane Smith",
+				"profile_picture": "https://example.com/jane.jpg"
+			},
+			"created_at": "2024-01-01T01:00:00.000Z"
+		}
+	]
+}
+```
+
+---
+
+## JavaScript Examples for Comments and Likes
+
+### Complete comments and likes management example:
+
+```javascript
+// Add a comment to an event
+async function addComment(eventId, text) {
+	try {
+		const response = await fetch(`/API/v1/events/${eventId}/comments`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+			body: JSON.stringify({ text }),
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comment added:', data);
+		return data;
+	} catch (error) {
+		console.error('Error adding comment:', error);
+		throw error;
+	}
+}
+
+// Get comments for an event
+async function getComments(eventId) {
+	try {
+		const response = await fetch(`/API/v1/events/${eventId}/comments`, {
+			method: 'GET',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comments:', data);
+		return data;
+	} catch (error) {
+		console.error('Error fetching comments:', error);
+		throw error;
+	}
+}
+
+// Like an event
+async function likeEvent(eventId) {
+	try {
+		const response = await fetch(`/API/v1/events/${eventId}/like`, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Event liked:', data);
+		return data;
+	} catch (error) {
+		console.error('Error liking event:', error);
+		throw error;
+	}
+}
+
+// Unlike an event
+async function unlikeEvent(eventId) {
+	try {
+		const response = await fetch(`/API/v1/events/${eventId}/like`, {
+			method: 'DELETE',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Event unliked:', data);
+		return data;
+	} catch (error) {
+		console.error('Error unliking event:', error);
+		throw error;
+	}
+}
+
+// Like a comment
+async function likeComment(eventId, commentId) {
+	try {
+		const response = await fetch(`/API/v1/events/${eventId}/comments/${commentId}/like`, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+			},
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		const data = await response.json();
+		console.log('Comment liked:', data);
+		return data;
+	} catch (error) {
+		console.error('Error liking comment:', error);
 		throw error;
 	}
 }

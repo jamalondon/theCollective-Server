@@ -109,6 +109,50 @@ exports.getPrayerRequests = async (req, res) => {
 	}
 };
 
+/**
+ * Get a single prayer request by ID with details
+ * GET /API/v1/prayer-requests/:id
+ */
+exports.getPrayerRequest = async (req, res) => {
+	try {
+		const { id } = req.params;
+
+		// Fetch the prayer request
+		const { data: prayerRequest, error: fetchError } = await supabase
+			.from('prayer_requests')
+			.select('*')
+			.eq('id', id)
+			.single();
+
+		if (fetchError || !prayerRequest) {
+			return res.status(404).json({ error: 'Prayer request not found' });
+		}
+
+		// Get like count
+		const { count: likeCount } = await supabase
+			.from('prayer_request_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('prayer_request_id', id);
+
+		// Get comment count
+		const { count: commentCount } = await supabase
+			.from('prayer_request_comments')
+			.select('*', { count: 'exact', head: true })
+			.eq('prayer_request_id', id);
+
+		res.status(200).json({
+			prayerRequest: {
+				...prayerRequest,
+				likeCount: likeCount || 0,
+				commentCount: commentCount || 0,
+			},
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
 exports.deletePrayerRequest = async (req, res) => {
 	try {
 		const user = req.user; // from requireAuth middleware
@@ -342,6 +386,310 @@ exports.deleteComment = async (req, res) => {
 		if (deleteError) throw deleteError;
 
 		res.status(200).json({ message: 'Comment deleted successfully' });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+// Prayer Request Like Controllers
+
+/**
+ * Like a prayer request
+ * POST /API/v1/prayer-requests/:id/like
+ */
+exports.likePrayerRequest = async (req, res) => {
+	try {
+		const user = req.user;
+		const { id: prayerRequestId } = req.params;
+
+		// Check if prayer request exists
+		const { data: prayerRequest, error: fetchError } = await supabase
+			.from('prayer_requests')
+			.select('id')
+			.eq('id', prayerRequestId)
+			.single();
+
+		if (fetchError || !prayerRequest) {
+			return res.status(404).json({ error: 'Prayer request not found' });
+		}
+
+		// Check if user already liked this prayer request
+		const { data: existingLike } = await supabase
+			.from('prayer_request_likes')
+			.select('id')
+			.eq('prayer_request_id', prayerRequestId)
+			.eq('user->>id', user.id)
+			.single();
+
+		if (existingLike) {
+			return res.status(400).json({ error: 'You have already liked this prayer request' });
+		}
+
+		// Insert the like
+		const { data: like, error: insertError } = await supabase
+			.from('prayer_request_likes')
+			.insert([
+				{
+					prayer_request_id: prayerRequestId,
+					user: {
+						id: user.id,
+						name: user.full_name,
+						profile_picture: user.profile_picture,
+					},
+				},
+			])
+			.select()
+			.single();
+
+		if (insertError) throw insertError;
+
+		// Get updated like count
+		const { count } = await supabase
+			.from('prayer_request_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('prayer_request_id', prayerRequestId);
+
+		res.status(201).json({ 
+			message: 'Prayer request liked successfully',
+			like,
+			likeCount: count 
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+/**
+ * Unlike a prayer request
+ * DELETE /API/v1/prayer-requests/:id/like
+ */
+exports.unlikePrayerRequest = async (req, res) => {
+	try {
+		const user = req.user;
+		const { id: prayerRequestId } = req.params;
+
+		// Check if prayer request exists
+		const { data: prayerRequest, error: fetchError } = await supabase
+			.from('prayer_requests')
+			.select('id')
+			.eq('id', prayerRequestId)
+			.single();
+
+		if (fetchError || !prayerRequest) {
+			return res.status(404).json({ error: 'Prayer request not found' });
+		}
+
+		// Delete the like
+		const { error: deleteError } = await supabase
+			.from('prayer_request_likes')
+			.delete()
+			.eq('prayer_request_id', prayerRequestId)
+			.eq('user->>id', user.id);
+
+		if (deleteError) throw deleteError;
+
+		// Get updated like count
+		const { count } = await supabase
+			.from('prayer_request_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('prayer_request_id', prayerRequestId);
+
+		res.status(200).json({ 
+			message: 'Prayer request unliked successfully',
+			likeCount: count 
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+/**
+ * Get likes for a prayer request
+ * GET /API/v1/prayer-requests/:id/likes
+ */
+exports.getPrayerRequestLikes = async (req, res) => {
+	try {
+		const { id: prayerRequestId } = req.params;
+
+		// Check if prayer request exists
+		const { data: prayerRequest, error: fetchError } = await supabase
+			.from('prayer_requests')
+			.select('id')
+			.eq('id', prayerRequestId)
+			.single();
+
+		if (fetchError || !prayerRequest) {
+			return res.status(404).json({ error: 'Prayer request not found' });
+		}
+
+		// Get all likes for the prayer request
+		const { data: likes, error: likesError } = await supabase
+			.from('prayer_request_likes')
+			.select('*')
+			.eq('prayer_request_id', prayerRequestId)
+			.order('created_at', { ascending: false });
+
+		if (likesError) throw likesError;
+
+		res.status(200).json({
+			total: likes.length,
+			likes,
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+// Comment Like Controllers
+
+/**
+ * Like a comment
+ * POST /API/v1/prayer-requests/:id/comments/:commentId/like
+ */
+exports.likeComment = async (req, res) => {
+	try {
+		const user = req.user;
+		const { commentId } = req.params;
+
+		// Check if comment exists
+		const { data: comment, error: fetchError } = await supabase
+			.from('prayer_request_comments')
+			.select('id')
+			.eq('id', commentId)
+			.single();
+
+		if (fetchError || !comment) {
+			return res.status(404).json({ error: 'Comment not found' });
+		}
+
+		// Check if user already liked this comment
+		const { data: existingLike } = await supabase
+			.from('prayer_request_comment_likes')
+			.select('id')
+			.eq('comment_id', commentId)
+			.eq('user->>id', user.id)
+			.single();
+
+		if (existingLike) {
+			return res.status(400).json({ error: 'You have already liked this comment' });
+		}
+
+		// Insert the like
+		const { data: like, error: insertError } = await supabase
+			.from('prayer_request_comment_likes')
+			.insert([
+				{
+					comment_id: commentId,
+					user: {
+						id: user.id,
+						name: user.full_name,
+						profile_picture: user.profile_picture,
+					},
+				},
+			])
+			.select()
+			.single();
+
+		if (insertError) throw insertError;
+
+		// Get updated like count
+		const { count } = await supabase
+			.from('prayer_request_comment_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('comment_id', commentId);
+
+		res.status(201).json({ 
+			message: 'Comment liked successfully',
+			like,
+			likeCount: count 
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+/**
+ * Unlike a comment
+ * DELETE /API/v1/prayer-requests/:id/comments/:commentId/like
+ */
+exports.unlikeComment = async (req, res) => {
+	try {
+		const user = req.user;
+		const { commentId } = req.params;
+
+		// Check if comment exists
+		const { data: comment, error: fetchError } = await supabase
+			.from('prayer_request_comments')
+			.select('id')
+			.eq('id', commentId)
+			.single();
+
+		if (fetchError || !comment) {
+			return res.status(404).json({ error: 'Comment not found' });
+		}
+
+		// Delete the like
+		const { error: deleteError } = await supabase
+			.from('prayer_request_comment_likes')
+			.delete()
+			.eq('comment_id', commentId)
+			.eq('user->>id', user.id);
+
+		if (deleteError) throw deleteError;
+
+		// Get updated like count
+		const { count } = await supabase
+			.from('prayer_request_comment_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('comment_id', commentId);
+
+		res.status(200).json({ 
+			message: 'Comment unliked successfully',
+			likeCount: count 
+		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+/**
+ * Get likes for a comment
+ * GET /API/v1/prayer-requests/:id/comments/:commentId/likes
+ */
+exports.getCommentLikes = async (req, res) => {
+	try {
+		const { commentId } = req.params;
+
+		// Check if comment exists
+		const { data: comment, error: fetchError } = await supabase
+			.from('prayer_request_comments')
+			.select('id')
+			.eq('id', commentId)
+			.single();
+
+		if (fetchError || !comment) {
+			return res.status(404).json({ error: 'Comment not found' });
+		}
+
+		// Get all likes for the comment
+		const { data: likes, error: likesError } = await supabase
+			.from('prayer_request_comment_likes')
+			.select('*')
+			.eq('comment_id', commentId)
+			.order('created_at', { ascending: false });
+
+		if (likesError) throw likesError;
+
+		res.status(200).json({
+			total: likes.length,
+			likes,
+		});
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });

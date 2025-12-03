@@ -20,6 +20,9 @@ router.post(
 // GET /API/v1/prayer-requests
 router.get('/', prayerRequestController.getPrayerRequests);
 
+// GET /API/v1/prayer-requests/:id - Get a single prayer request
+router.get('/:id', prayerRequestController.getPrayerRequest);
+
 // DELETE /API/v1/prayer-request/:id
 router.delete('/:id', requireAuth, prayerRequestController.deletePrayerRequest);
 
@@ -43,6 +46,39 @@ router.delete(
 	'/:id/comments/:commentId',
 	requireAuth,
 	prayerRequestController.deleteComment
+);
+
+// Like Routes //
+
+//Like a prayer request
+router.post('/:id/like', requireAuth, prayerRequestController.likePrayerRequest);
+
+//Unlike a prayer request
+router.delete('/:id/like', requireAuth, prayerRequestController.unlikePrayerRequest);
+
+//Get all likes for a prayer request
+router.get('/:id/likes', prayerRequestController.getPrayerRequestLikes);
+
+// Comment Like Routes //
+
+//Like a comment
+router.post(
+	'/:id/comments/:commentId/like',
+	requireAuth,
+	prayerRequestController.likeComment
+);
+
+//Unlike a comment
+router.delete(
+	'/:id/comments/:commentId/like',
+	requireAuth,
+	prayerRequestController.unlikeComment
+);
+
+//Get all likes for a comment
+router.get(
+	'/:id/comments/:commentId/likes',
+	prayerRequestController.getCommentLikes
 );
 
 module.exports = router;
