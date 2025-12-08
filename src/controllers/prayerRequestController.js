@@ -158,10 +158,10 @@ exports.deletePrayerRequest = async (req, res) => {
 		const user = req.user; // from requireAuth middleware
 		const { id } = req.params;
 
-		// Fetch the prayer request to check ownership
+		// Fetch the prayer request to check ownership and get photos
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('owner')
+			.select('owner, photos')
 			.eq('id', id)
 			.single();
 
@@ -175,6 +175,32 @@ exports.deletePrayerRequest = async (req, res) => {
 				.json({ error: 'You can only delete your own prayer requests' });
 		}
 
+		// Delete associated media from prayer-media bucket
+		if (prayerRequest.photos && prayerRequest.photos.length > 0) {
+			const filePaths = prayerRequest.photos.map((url) => {
+				// Extract file path from public URL
+				// URL format: {SUPABASE_URL}/storage/v1/object/public/prayer-media/{path}
+				const bucketPath = '/storage/v1/object/public/prayer-media/';
+				const pathIndex = url.indexOf(bucketPath);
+				if (pathIndex !== -1) {
+					return url.substring(pathIndex + bucketPath.length);
+				}
+				return null;
+			}).filter(Boolean);
+
+			if (filePaths.length > 0) {
+				const { error: storageError } = await supabase.storage
+					.from('prayer-media')
+					.remove(filePaths);
+
+				if (storageError) {
+					console.error('Error deleting media from storage:', storageError);
+					// Continue with deletion even if storage cleanup fails
+				}
+			}
+		}
+
+		// Delete the prayer request from database
 		const { error: deleteError } = await supabase
 			.from('prayer_requests')
 			.delete()

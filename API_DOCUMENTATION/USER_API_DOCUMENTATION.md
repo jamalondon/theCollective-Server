@@ -417,6 +417,71 @@ curl -X GET \
 
 ---
 
+## 8. Get All Users
+
+**GET** `/all-users?page=1&limit=20`
+
+Get a paginated list of all users in the system.
+
+### Request
+
+```javascript
+fetch('/api/users/all-users?page=1&limit=20', {
+	method: 'GET',
+	headers: {
+		Authorization: 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Example
+
+```bash
+curl -X GET \
+  "http://localhost:3000/api/users/all-users?page=1&limit=20" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### Query Parameters
+
+- `page` (optional): Page number, default: 1
+- `limit` (optional): Items per page, default: 20
+
+### Response
+
+```json
+{
+	"success": true,
+	"data": [
+		{
+			"id": "user-id-1",
+			"username": "johndoe",
+			"name": "John Doe",
+			"profile_picture": "https://example.com/profile1.jpg",
+			"date_of_birth": "1990-01-01",
+			"created_at": "2024-01-01T00:00:00Z"
+		},
+		{
+			"id": "user-id-2",
+			"username": "janesmith",
+			"name": "Jane Smith",
+			"profile_picture": "https://example.com/profile2.jpg",
+			"date_of_birth": "1992-05-15",
+			"created_at": "2024-01-02T00:00:00Z"
+		}
+	],
+	"pagination": {
+		"currentPage": 1,
+		"totalPages": 5,
+		"totalCount": 100,
+		"hasNext": true,
+		"hasPrev": false
+	}
+}
+```
+
+---
+
 ## Error Responses
 
 All routes may return these error responses:

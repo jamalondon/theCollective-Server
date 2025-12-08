@@ -9,9 +9,9 @@ const supabase = createClient(
 	process.env.SUPABASE_SERVICE_KEY
 );
 
-/**
- * Upload profile picture for authenticated user
- * Handles file upload to Supabase storage and updates user record
+/*
+ Upload profile picture for authenticated user
+ Handles file upload to Supabase storage and updates user record
  */
 exports.uploadProfilePicture = catchAsync(async (req, res, next) => {
 	if (!req.file) {
@@ -55,9 +55,9 @@ exports.uploadProfilePicture = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Search for users by name
- * Returns partial user information for search results
+/*
+ Search for users by name
+ Returns partial user information for search results
  */
 exports.searchUsers = catchAsync(async (req, res, next) => {
 	const { query } = req.query;
@@ -96,9 +96,9 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get prayer requests created by the authenticated user
- * Includes request details and current status
+/*
+ Get prayer requests created by the authenticated user
+ Includes request details and current status
  */
 exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
@@ -144,9 +144,9 @@ exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get prayer requests the user has commented on
- * Includes the prayer request details and user's comments
+/*
+ Get prayer requests the user has commented on
+ Includes the prayer request details and user's comments
  */
 exports.getUserPrayerComments = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
@@ -205,9 +205,9 @@ exports.getUserPrayerComments = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get events the user has attended or registered for
- * Includes event details and attendance status
+/*
+ Get events the user has attended or registered for
+ Includes event details and attendance status
  */
 exports.getUserEvents = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10, status = 'all' } = req.query;
@@ -275,9 +275,9 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get sermon discussions the user has participated in
- * Includes sermon details and user's discussion contributions
+/*
+ Get sermon discussions the user has participated in
+ Includes sermon details and user's discussion contributions
  */
 exports.getUserSermonDiscussions = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
@@ -331,9 +331,9 @@ exports.getUserSermonDiscussions = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get comprehensive user profile information
- * Includes basic profile data and activity summary
+/*
+ Get comprehensive user profile information
+ Includes basic profile data and activity summary
  */
 exports.getUserProfile = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -341,7 +341,7 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 	// Get user basic information
 	const { data: user, error: userError } = await supabase
 		.from('users')
-		.select('id, username, name, profile_picture, date_of_birth, created_at')
+		.select('id, username, full_name, profile_picture, date_of_birth, created_at')
 		.eq('id', userId)
 		.single();
 
@@ -351,8 +351,10 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 	const [
 		{ count: prayerRequestCount },
 		{ count: prayerCommentCount },
-		{ count: eventCount },
+		{ count: eventsAttendedCount },
 		{ count: sermonDiscussionCount },
+		{ count: eventsCreatedCount },
+		{ count: friendCount },
 	] = await Promise.all([
 		supabase
 			.from('prayer_requests')
@@ -370,25 +372,34 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 			.from('sermon_discussion_comments')
 			.select('*', { count: 'exact', head: true })
 			.eq('user_id', userId),
+		supabase
+			.from('events')
+			.select('*', { count: 'exact', head: true })
+			.eq('owner->>id', userId),
+		supabase
+			.from('friendships')
+			.select('*', { count: 'exact', head: true })
+			.or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+			.eq('status', 'accepted'),
 	]);
 
 	res.status(200).json({
 		success: true,
-		data: {
-			user,
-			activitySummary: {
-				prayerRequestsCreated: prayerRequestCount || 0,
-				prayerRequestsCommented: prayerCommentCount || 0,
-				eventsAttended: eventCount || 0,
-				sermonDiscussionsParticipated: sermonDiscussionCount || 0,
-			},
+		user,
+		activitySummary: {
+			prayerRequestsCreated: prayerRequestCount || 0,
+			prayerRequestsCommented: prayerCommentCount || 0,
+			eventsAttended: eventsAttendedCount || 0,
+			sermonDiscussionsParticipated: sermonDiscussionCount || 0,
+			eventsCreated: eventsCreatedCount || 0,
+			friends: friendCount || 0,
 		},
 	});
 });
 
-/**
- * Get news feed containing all prayer requests and events
- * Returns a combined feed of recent prayer requests and events
+/*
+ Get news feed containing all prayer requests and events
+ Returns a combined feed of recent prayer requests and events
  */
 exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	const { limit = 20 } = req.query;
@@ -444,9 +455,9 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 // FRIEND MANAGEMENT FUNCTIONS
 // ============================================
 
-/**
- * Send a friend request to another user
- * Creates a pending friendship record
+/*
+ Send a friend request to another user
+ Creates a pending friendship record
  */
 exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 	const { userId } = req.body;
@@ -534,9 +545,9 @@ exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Accept a friend request
- * Updates the friendship status to 'accepted'
+/*
+ Accept a friend request
+ Updates the friendship status to 'accepted'
  */
 exports.acceptFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -572,9 +583,9 @@ exports.acceptFriendRequest = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Reject a friend request
- * Updates the friendship status to 'rejected'
+/*
+ Reject a friend request
+ Updates the friendship status to 'rejected'
  */
 exports.rejectFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -610,9 +621,9 @@ exports.rejectFriendRequest = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Cancel a pending friend request
- * Deletes the friendship record if user is the requester
+/*
+ Cancel a pending friend request
+ Deletes the friendship record if user is the requester
  */
 exports.cancelFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -645,9 +656,9 @@ exports.cancelFriendRequest = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Remove a friend
- * Deletes the friendship record (unfriend)
+/*
+ Remove a friend
+ Deletes the friendship record (unfriend)
  */
 exports.removeFriend = catchAsync(async (req, res, next) => {
 	const { userId } = req.params;
@@ -687,9 +698,9 @@ exports.removeFriend = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get user's friends list
- * Returns all accepted friendships with user details
+/*
+ Get user's friends list
+ Returns all accepted friendships with user details
  */
 exports.getFriends = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -758,9 +769,9 @@ exports.getFriends = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get pending friend requests received by the user
- * Returns friend requests where user is the addressee
+/*
+ Get pending friend requests received by the user
+ Returns friend requests where user is the addressee
  */
 exports.getPendingFriendRequests = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -829,9 +840,9 @@ exports.getPendingFriendRequests = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get friend requests sent by the user
- * Returns friend requests where user is the requester
+/*
+ Get friend requests sent by the user
+ Returns friend requests where user is the requester
  */
 exports.getSentFriendRequests = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -900,9 +911,9 @@ exports.getSentFriendRequests = catchAsync(async (req, res, next) => {
 	});
 });
 
-/**
- * Get friendship status with a specific user
- * Returns the friendship status between current user and target user
+/*
+ Get friendship status with a specific user
+ Returns the friendship status between current user and target user
  */
 exports.getFriendshipStatus = catchAsync(async (req, res, next) => {
 	const { userId } = req.params;
@@ -949,5 +960,33 @@ exports.getFriendshipStatus = catchAsync(async (req, res, next) => {
 	res.status(200).json({
 		success: true,
 		data: statusInfo,
+	});
+});
+
+/*
+ Return all the users in the database
+*/
+exports.getAllUsers = catchAsync(async (req, res, next) => {
+	const { page = 1, limit = 20 } = req.query;
+	const offset = (page - 1) * limit;
+
+	const { data: users, error } = await supabase
+		.from('users')
+		.select('*')
+		.order('created_at', { ascending: false })
+		.range(offset, offset + limit - 1);
+
+	if (error) throw error;
+
+	res.status(200).json({
+		success: true,
+		data: users,
+		pagination: {
+			currentPage: parseInt(page),
+			totalPages: Math.ceil(users.length / limit),
+			totalCount: users.length,
+			hasNext: page * limit < users.length,
+			hasPrev: page > 1,
+		},
 	});
 });

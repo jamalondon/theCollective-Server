@@ -49,6 +49,9 @@ router.get(
 // Get news feed with prayer requests and events
 router.get('/news-feed', requireAuth, userController.getNewsFeed);
 
+// Get all users
+router.get('/all-users', requireAuth, userController.getAllUsers);
+
 // Send a friend request
 router.post('/friends/request', requireAuth, userController.sendFriendRequest);
 
