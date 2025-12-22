@@ -4,6 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const requireAuth = require('../middlewares/requireAuth');
 const userController = require('../controllers/userController');
+const pushTokenController = require('../controllers/pushTokenController');
 
 // Configure multer for memory storage
 const upload = multer({ storage: multer.memoryStorage() });
@@ -15,6 +16,9 @@ router.post(
 	upload.single('profilePicture'),
 	userController.uploadProfilePicture
 );
+
+// Push token registration route
+router.post('/push-token', requireAuth, pushTokenController.upsertPushToken);
 
 // User search route
 router.get('/search', requireAuth, userController.searchUsers);

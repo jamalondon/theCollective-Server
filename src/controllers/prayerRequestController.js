@@ -1,6 +1,7 @@
 const supabase = require('../supabase');
 const localLMAPI = require('../APIs/LocalLMAPI');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
+const { sendPrayerRequestCreatedPush } = require('../utils/expoPush');
 
 
 // Prayer Request Controllers
@@ -80,6 +81,11 @@ exports.createPrayerRequest = async (req, res) => {
 			.select();
 
 		if (error) throw error;
+
+		// Fire-and-forget push broadcast (do not block response)
+		sendPrayerRequestCreatedPush(data[0]).catch((e) => {
+			console.error('Push notification send failed:', e?.message || e);
+		});
 
 		// Populate owner info (handles anonymous case)
 		const populatedRequest = await populateOwner(data[0], { isAnonymous });

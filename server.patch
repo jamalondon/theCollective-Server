@@ -1,0 +1,212 @@
+diff --git a/src/routes/userRoutes.js b/src/routes/userRoutes.js
+index 03cc0a3..2a7c5d9 100644
+--- a/src/routes/userRoutes.js
++++ b/src/routes/userRoutes.js
+@@ -3,9 +3,10 @@ const router = express.Router();
+ 
+ const multer = require('multer');
+ const requireAuth = require('../middlewares/requireAuth');
+ const userController = require('../controllers/userController');
++const pushTokenController = require('../controllers/pushTokenController');
+ 
+ // Configure multer for memory storage
+ const upload = multer({ storage: multer.memoryStorage() });
+ 
+@@ -17,6 +18,9 @@ router.post(
+ 	userController.uploadProfilePicture
+ );
+ 
++// Upsert Expo push token (one user can have multiple devices)
++router.post('/push-token', requireAuth, pushTokenController.upsertPushToken);
++
+ // User search route
+ router.get('/search', requireAuth, userController.searchUsers);
+ 
+diff --git a/src/controllers/pushTokenController.js b/src/controllers/pushTokenController.js
+new file mode 100644
+index 0000000..e1c5f6b
+--- /dev/null
++++ b/src/controllers/pushTokenController.js
+@@ -0,0 +1,63 @@
++const supabase = require('../supabase');
++
++const isProbablyExpoPushToken = (token) => {
++	if (!token || typeof token !== 'string') return false;
++	// Common formats: ExponentPushToken[...], ExpoPushToken[...]
++	return (
++		token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')
++	);
++};
++
++/*
++ Upsert Expo push token for authenticated user
++ POST /API/v1/users/push-token
++ Body: { expoPushToken: string, platform?: 'ios'|'android', deviceId?: string }
++*/
++exports.upsertPushToken = async (req, res) => {
++	try {
++		const user = req.user;
++		const { expoPushToken, platform, deviceId } = req.body || {};
++
++		if (!expoPushToken) {
++			return res.status(400).json({ message: 'expoPushToken is required' });
++		}
++
++		if (!isProbablyExpoPushToken(expoPushToken)) {
++			return res
++				.status(400)
++				.json({ message: 'Invalid Expo push token format' });
++		}
++
++		const record = {
++			user_id: user.id,
++			expo_push_token: expoPushToken,
++			platform: platform || null,
++			device_id: deviceId || null,
++			last_seen_at: new Date().toISOString(),
++			disabled_at: null,
++		};
++
++		const { data, error } = await supabase
++			.from('push_tokens')
++			.upsert(record, { onConflict: 'expo_push_token' })
++			.select()
++			.single();
++
++		if (error) {
++			console.error('Error upserting push token:', error);
++			return res.status(500).json({ message: error.message });
++		}
++
++		return res.status(200).json({ success: true, data });
++	} catch (err) {
++		console.error(err);
++		return res.status(500).json({ message: err.message });
++	}
++};
++
+diff --git a/src/utils/expoPush.js b/src/utils/expoPush.js
+new file mode 100644
+index 0000000..d9f2f70
+--- /dev/null
++++ b/src/utils/expoPush.js
+@@ -0,0 +1,119 @@
++const axios = require('axios');
++const supabase = require('../supabase');
++
++const EXPO_PUSH_SEND_URL = 'https://exp.host/--/api/v2/push/send';
++
++const isProbablyExpoPushToken = (token) => {
++	if (!token || typeof token !== 'string') return false;
++	return (
++		token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')
++	);
++};
++
++const chunk = (arr, size) => {
++	const out = [];
++	for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
++	return out;
++};
++
++const disableToken = async (expoPushToken) => {
++	try {
++		await supabase
++			.from('push_tokens')
++			.update({ disabled_at: new Date().toISOString() })
++			.eq('expo_push_token', expoPushToken);
++	} catch (e) {
++		console.error('Failed to disable push token:', expoPushToken, e?.message);
++	}
++};
++
++const fetchActiveTokens = async () => {
++	const { data, error } = await supabase
++		.from('push_tokens')
++		.select('expo_push_token')
++		.is('disabled_at', null);
++
++	if (error) throw error;
++	return (data || [])
++		.map((row) => row.expo_push_token)
++		.filter(isProbablyExpoPushToken);
++};
++
++async function sendExpoPushMessages(messages) {
++	// Expo HTTP API accepts up to 100 messages per request.
++	const chunks = chunk(messages, 100);
++	for (const c of chunks) {
++		const resp = await axios.post(EXPO_PUSH_SEND_URL, c, {
++			headers: {
++				'Content-Type': 'application/json',
++				Accept: 'application/json',
++				'Accept-Encoding': 'gzip, deflate',
++			},
++		});
++
++		const tickets = resp?.data?.data || [];
++		// If Expo flags a token immediately, disable it.
++		for (let i = 0; i < tickets.length; i++) {
++			const t = tickets[i];
++			if (t?.status === 'error') {
++				const original = c[i];
++				const token = original?.to;
++				const expoError = t?.details?.error;
++				if (expoError === 'DeviceNotRegistered' && token) {
++					await disableToken(token);
++				}
++			}
++		}
++	}
++}
++
++/**
++ * Broadcast: new prayer request created.
++ * Expects `push_tokens` table to exist.
++ */
++exports.sendPrayerRequestCreatedPush = async (prayerRequestRow) => {
++	const tokens = await fetchActiveTokens();
++	if (!tokens.length) return { sent: 0 };
++
++	const title = 'New prayer request';
++	const body = prayerRequestRow?.anonymous
++		? 'A new prayer request was posted'
++		: prayerRequestRow?.title || 'A new prayer request was posted';
++
++	const messages = tokens.map((to) => ({
++		to,
++		sound: 'default',
++		title,
++		body,
++		data: { type: 'prayer_request', id: prayerRequestRow?.id },
++	}));
++
++	await sendExpoPushMessages(messages);
++	return { sent: messages.length };
++};
++
+diff --git a/src/controllers/prayerRequestController.js b/src/controllers/prayerRequestController.js
+index 8741fcf..a2cbd3a 100644
+--- a/src/controllers/prayerRequestController.js
++++ b/src/controllers/prayerRequestController.js
+@@ -1,6 +1,7 @@
+ const supabase = require('../supabase');
+ const localLMAPI = require('../APIs/LocalLMAPI');
+ const { populateOwner, populateUser } = require('../utils/populateUserInfo');
++const { sendPrayerRequestCreatedPush } = require('../utils/expoPush');
+ 
+ 
+ // Prayer Request Controllers
+@@ -82,6 +83,13 @@ exports.createPrayerRequest = async (req, res) => {
+ 
+ 		if (error) throw error;
+ 
++		// Fire-and-forget push broadcast (don't block request)
++		sendPrayerRequestCreatedPush(data[0]).catch((e) => {
++			console.error('Push notification send failed:', e?.message || e);
++		});
++
+ 		// Populate owner info (handles anonymous case)
+ 		const populatedRequest = await populateOwner(data[0], { isAnonymous });
+ 
+
