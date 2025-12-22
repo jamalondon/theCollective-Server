@@ -1,4 +1,7 @@
 const supabase = require('../supabase');
+const localLMAPI = require('../APIs/LocalLMAPI');
+const { populateOwner, populateUser } = require('../utils/populateUserInfo');
+
 
 // Prayer Request Controllers
 exports.createPrayerRequest = async (req, res) => {
@@ -60,14 +63,9 @@ exports.createPrayerRequest = async (req, res) => {
 			? req.body.title.trim()
 			: 'Pray for ' + user.full_name;
 
-		// Prepare prayer request object
-		// Use ownerInfo from middleware (handles anonymous case)
+		// Prepare prayer request object with only owner_id
 		const prayerRequest = {
-			owner: req.ownerInfo || {
-				id: user.id,
-				name: user.full_name,
-				profile_picture: user.profile_picture,
-			},
+			owner_id: user.id,
 			comments: [],
 			photos: photoUrls,
 			text,
@@ -83,7 +81,10 @@ exports.createPrayerRequest = async (req, res) => {
 
 		if (error) throw error;
 
-		res.status(201).json({ prayerRequest: data[0] });
+		// Populate owner info (handles anonymous case)
+		const populatedRequest = await populateOwner(data[0], { isAnonymous });
+
+		res.status(201).json({ prayerRequest: populatedRequest });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });
@@ -99,9 +100,36 @@ exports.getPrayerRequests = async (req, res) => {
 
 		if (error) throw error;
 
+		// Populate owner info for all prayer requests
+		const populatedRequests = await populateOwner(data);
+
+		// Get like counts for all prayer requests
+		if (populatedRequests && populatedRequests.length > 0) {
+			const prayerRequestIds = populatedRequests.map((pr) => pr.id);
+			
+			// Get like counts grouped by prayer_request_id
+			const { data: likeCounts, error: likeError } = await supabase
+				.from('prayer_request_likes')
+				.select('prayer_request_id')
+				.in('prayer_request_id', prayerRequestIds);
+
+			if (likeError) throw likeError;
+
+			// Count likes per prayer request
+			const likeCountMap = {};
+			likeCounts?.forEach((like) => {
+				likeCountMap[like.prayer_request_id] = (likeCountMap[like.prayer_request_id] || 0) + 1;
+			});
+
+			// Add likeCount to each prayer request
+			populatedRequests.forEach((pr) => {
+				pr.likeCount = likeCountMap[pr.id] || 0;
+			});
+		}
+
 		res.status(200).json({
-			total: data ? data.length : 0,
-			prayerRequests: data,
+			total: populatedRequests ? populatedRequests.length : 0,
+			prayerRequests: populatedRequests,
 		});
 	} catch (err) {
 		console.error(err);
@@ -109,9 +137,9 @@ exports.getPrayerRequests = async (req, res) => {
 	}
 };
 
-/**
- * Get a single prayer request by ID with details
- * GET /API/v1/prayer-requests/:id
+/*
+ Get a single prayer request by ID with details
+ GET /API/v1/prayer-requests/:id
  */
 exports.getPrayerRequest = async (req, res) => {
 	try {
@@ -134,17 +162,27 @@ exports.getPrayerRequest = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('prayer_request_id', id);
 
-		// Get comment count
-		const { count: commentCount } = await supabase
+		// Get comments for this prayer request
+		const { data: comments, error: commentsError } = await supabase
 			.from('prayer_request_comments')
-			.select('*', { count: 'exact', head: true })
-			.eq('prayer_request_id', id);
+			.select('*')
+			.eq('prayer_request_id', id)
+			.order('created_at', { ascending: true });
+
+		if (commentsError) throw commentsError;
+
+		// Populate user info for comments
+		const populatedComments = await populateUser(comments || []);
+
+		// Populate owner info
+		const populatedRequest = await populateOwner(prayerRequest);
 
 		res.status(200).json({
 			prayerRequest: {
-				...prayerRequest,
+				...populatedRequest,
 				likeCount: likeCount || 0,
-				commentCount: commentCount || 0,
+				commentCount: populatedComments.length,
+				comments: populatedComments,
 			},
 		});
 	} catch (err) {
@@ -153,6 +191,10 @@ exports.getPrayerRequest = async (req, res) => {
 	}
 };
 
+/*
+ Delete a prayer request
+ DELETE /API/v1/prayer-requests/:id
+ */
 exports.deletePrayerRequest = async (req, res) => {
 	try {
 		const user = req.user; // from requireAuth middleware
@@ -161,7 +203,7 @@ exports.deletePrayerRequest = async (req, res) => {
 		// Fetch the prayer request to check ownership and get photos
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('owner, photos')
+			.select('owner_id, photos')
 			.eq('id', id)
 			.single();
 
@@ -169,7 +211,7 @@ exports.deletePrayerRequest = async (req, res) => {
 			return res.status(404).json({ error: `Prayer request not found` });
 		}
 
-		if (prayerRequest.owner.id !== user.id) {
+		if (prayerRequest.owner_id !== user.id) {
 			return res
 				.status(403)
 				.json({ error: 'You can only delete your own prayer requests' });
@@ -216,9 +258,9 @@ exports.deletePrayerRequest = async (req, res) => {
 };
 
 // Prayer Request Comment Controllers
-/**
- * Add a comment to a prayer request
- * POST /API/v1/prayer-requests/:id/comments
+/*
+ Add a comment to a prayer request
+ POST /API/v1/prayer-requests/:id/comments
  */
 exports.addComment = async (req, res) => {
 	try {
@@ -245,17 +287,13 @@ exports.addComment = async (req, res) => {
 			return res.status(404).json({ error: 'Prayer request not found' });
 		}
 
-		// Insert comment into the database
+		// Insert comment with only user_id
 		const { data: comment, error: insertError } = await supabase
 			.from('prayer_request_comments')
 			.insert([
 				{
 					prayer_request_id: prayerRequestId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 					text,
 				},
 			])
@@ -264,16 +302,19 @@ exports.addComment = async (req, res) => {
 
 		if (insertError) throw insertError;
 
-		res.status(201).json({ comment });
+		// Populate user info
+		const populatedComment = await populateUser(comment);
+
+		res.status(201).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });
 	}
 };
 
-/**
- * Get all comments for a prayer request
- * GET /API/v1/prayer-requests/:id/comments
+/*
+ Get all comments for a prayer request
+ GET /API/v1/prayer-requests/:id/comments
  */
 exports.getComments = async (req, res) => {
 	try {
@@ -290,7 +331,7 @@ exports.getComments = async (req, res) => {
 			return res.status(404).json({ error: 'Prayer request not found' });
 		}
 
-		// Get all comments for the prayer request (user info is embedded in each comment)
+		// Get all comments for the prayer request
 		const { data: comments, error: commentsError } = await supabase
 			.from('prayer_request_comments')
 			.select('*')
@@ -299,9 +340,12 @@ exports.getComments = async (req, res) => {
 
 		if (commentsError) throw commentsError;
 
+		// Populate user info for all comments
+		const populatedComments = await populateUser(comments);
+
 		res.status(200).json({
-			total: comments.length,
-			comments,
+			total: populatedComments.length,
+			comments: populatedComments,
 		});
 	} catch (err) {
 		console.error(err);
@@ -309,9 +353,9 @@ exports.getComments = async (req, res) => {
 	}
 };
 
-/**
- * Update a comment
- * PUT /API/v1/prayer-requests/:id/comments/:commentId
+/*
+ Update a comment
+ PUT /API/v1/prayer-requests/:id/comments/:commentId
  */
 exports.updateComment = async (req, res) => {
 	try {
@@ -338,7 +382,7 @@ exports.updateComment = async (req, res) => {
 			return res.status(404).json({ error: 'Comment not found' });
 		}
 
-		if (existingComment.user.id !== user.id) {
+		if (existingComment.user_id !== user.id) {
 			return res
 				.status(403)
 				.json({ error: 'You can only edit your own comments' });
@@ -354,16 +398,19 @@ exports.updateComment = async (req, res) => {
 
 		if (updateError) throw updateError;
 
-		res.status(200).json({ comment: updatedComment });
+		// Populate user info
+		const populatedComment = await populateUser(updatedComment);
+
+		res.status(200).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });
 	}
 };
 
-/**
- * Delete a comment
- * DELETE /API/v1/prayer-requests/:id/comments/:commentId
+/*
+ Delete a comment
+ DELETE /API/v1/prayer-requests/:id/comments/:commentId
  */
 exports.deleteComment = async (req, res) => {
 	try {
@@ -384,7 +431,7 @@ exports.deleteComment = async (req, res) => {
 		// Check if prayer request exists and get owner
 		const { data: prayerRequest, error: prFetchError } = await supabase
 			.from('prayer_requests')
-			.select('owner')
+			.select('owner_id')
 			.eq('id', prayerRequestId)
 			.single();
 
@@ -393,8 +440,8 @@ exports.deleteComment = async (req, res) => {
 		}
 
 		// Allow deletion if user is comment owner OR prayer request owner
-		const isCommentOwner = existingComment.user.id === user.id;
-		const isPrayerRequestOwner = prayerRequest.owner.id === user.id;
+		const isCommentOwner = existingComment.user_id === user.id;
+		const isPrayerRequestOwner = prayerRequest.owner_id === user.id;
 
 		if (!isCommentOwner && !isPrayerRequestOwner) {
 			return res.status(403).json({
@@ -420,9 +467,9 @@ exports.deleteComment = async (req, res) => {
 
 // Prayer Request Like Controllers
 
-/**
- * Like a prayer request
- * POST /API/v1/prayer-requests/:id/like
+/*
+ Like a prayer request
+ POST /API/v1/prayer-requests/:id/like
  */
 exports.likePrayerRequest = async (req, res) => {
 	try {
@@ -445,24 +492,20 @@ exports.likePrayerRequest = async (req, res) => {
 			.from('prayer_request_likes')
 			.select('id')
 			.eq('prayer_request_id', prayerRequestId)
-			.eq('user->>id', user.id)
+			.eq('user_id', user.id)
 			.single();
 
 		if (existingLike) {
 			return res.status(400).json({ error: 'You have already liked this prayer request' });
 		}
 
-		// Insert the like
+		// Insert the like with only user_id
 		const { data: like, error: insertError } = await supabase
 			.from('prayer_request_likes')
 			.insert([
 				{
 					prayer_request_id: prayerRequestId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 				},
 			])
 			.select()
@@ -476,9 +519,12 @@ exports.likePrayerRequest = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('prayer_request_id', prayerRequestId);
 
+		// Populate user info
+		const populatedLike = await populateUser(like);
+
 		res.status(201).json({ 
 			message: 'Prayer request liked successfully',
-			like,
+			like: populatedLike,
 			likeCount: count 
 		});
 	} catch (err) {
@@ -487,9 +533,9 @@ exports.likePrayerRequest = async (req, res) => {
 	}
 };
 
-/**
- * Unlike a prayer request
- * DELETE /API/v1/prayer-requests/:id/like
+/*
+ Unlike a prayer request
+ DELETE /API/v1/prayer-requests/:id/like
  */
 exports.unlikePrayerRequest = async (req, res) => {
 	try {
@@ -512,7 +558,7 @@ exports.unlikePrayerRequest = async (req, res) => {
 			.from('prayer_request_likes')
 			.delete()
 			.eq('prayer_request_id', prayerRequestId)
-			.eq('user->>id', user.id);
+			.eq('user_id', user.id);
 
 		if (deleteError) throw deleteError;
 
@@ -532,9 +578,9 @@ exports.unlikePrayerRequest = async (req, res) => {
 	}
 };
 
-/**
- * Get likes for a prayer request
- * GET /API/v1/prayer-requests/:id/likes
+/*
+ Get likes for a prayer request
+ GET /API/v1/prayer-requests/:id/likes
  */
 exports.getPrayerRequestLikes = async (req, res) => {
 	try {
@@ -560,9 +606,12 @@ exports.getPrayerRequestLikes = async (req, res) => {
 
 		if (likesError) throw likesError;
 
+		// Populate user info for all likes
+		const populatedLikes = await populateUser(likes);
+
 		res.status(200).json({
-			total: likes.length,
-			likes,
+			total: populatedLikes.length,
+			likes: populatedLikes,
 		});
 	} catch (err) {
 		console.error(err);
@@ -572,9 +621,9 @@ exports.getPrayerRequestLikes = async (req, res) => {
 
 // Comment Like Controllers
 
-/**
- * Like a comment
- * POST /API/v1/prayer-requests/:id/comments/:commentId/like
+/*
+ Like a comment
+ POST /API/v1/prayer-requests/:id/comments/:commentId/like
  */
 exports.likeComment = async (req, res) => {
 	try {
@@ -597,24 +646,20 @@ exports.likeComment = async (req, res) => {
 			.from('prayer_request_comment_likes')
 			.select('id')
 			.eq('comment_id', commentId)
-			.eq('user->>id', user.id)
+			.eq('user_id', user.id)
 			.single();
 
 		if (existingLike) {
 			return res.status(400).json({ error: 'You have already liked this comment' });
 		}
 
-		// Insert the like
+		// Insert the like with only user_id
 		const { data: like, error: insertError } = await supabase
 			.from('prayer_request_comment_likes')
 			.insert([
 				{
 					comment_id: commentId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 				},
 			])
 			.select()
@@ -628,9 +673,12 @@ exports.likeComment = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('comment_id', commentId);
 
+		// Populate user info
+		const populatedLike = await populateUser(like);
+
 		res.status(201).json({ 
 			message: 'Comment liked successfully',
-			like,
+			like: populatedLike,
 			likeCount: count 
 		});
 	} catch (err) {
@@ -639,9 +687,9 @@ exports.likeComment = async (req, res) => {
 	}
 };
 
-/**
- * Unlike a comment
- * DELETE /API/v1/prayer-requests/:id/comments/:commentId/like
+/*
+ Unlike a comment
+ DELETE /API/v1/prayer-requests/:id/comments/:commentId/like
  */
 exports.unlikeComment = async (req, res) => {
 	try {
@@ -664,7 +712,7 @@ exports.unlikeComment = async (req, res) => {
 			.from('prayer_request_comment_likes')
 			.delete()
 			.eq('comment_id', commentId)
-			.eq('user->>id', user.id);
+			.eq('user_id', user.id);
 
 		if (deleteError) throw deleteError;
 
@@ -684,9 +732,9 @@ exports.unlikeComment = async (req, res) => {
 	}
 };
 
-/**
- * Get likes for a comment
- * GET /API/v1/prayer-requests/:id/comments/:commentId/likes
+/*
+ Get likes for a comment
+ GET /API/v1/prayer-requests/:id/comments/:commentId/likes
  */
 exports.getCommentLikes = async (req, res) => {
 	try {
@@ -712,10 +760,27 @@ exports.getCommentLikes = async (req, res) => {
 
 		if (likesError) throw likesError;
 
+		// Populate user info for all likes
+		const populatedLikes = await populateUser(likes);
+
 		res.status(200).json({
-			total: likes.length,
-			likes,
+			total: populatedLikes.length,
+			likes: populatedLikes,
 		});
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: err.message });
+	}
+};
+
+/*
+Test to make sure the LocalLM is running
+GET /API/v1/prayer-requests/test-local-lm
+*/
+exports.testLocalLM = async (req, res) => {
+	try {
+		const response = await localLMAPI.get('/v1/models');
+		res.status(200).json({ message: 'LocalLM is running', response: response.data });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });

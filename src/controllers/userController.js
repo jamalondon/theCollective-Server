@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const AppError = require('../utils/AppError');
 const catchAsync = require('../utils/catchAsync');
+const { populateOwner, populateUser } = require('../utils/populateUserInfo');
 require('dotenv').config();
 
 // Initialize Supabase client
@@ -12,10 +13,34 @@ const supabase = createClient(
 /*
  Upload profile picture for authenticated user
  Handles file upload to Supabase storage and updates user record
+ POST /API/v1/users/upload-profile-picture
  */
 exports.uploadProfilePicture = catchAsync(async (req, res, next) => {
 	if (!req.file) {
 		return next(new AppError('No file uploaded', 400));
+	}
+
+	// Get the current user's profile picture to delete it later
+	const { data: userData, error: userError } = await supabase
+		.from('users')
+		.select('profile_picture')
+		.eq('id', req.user.id)
+		.single();
+
+	if (userError) {
+		throw userError;
+	}
+
+	// Delete the old profile picture from storage if it exists
+	if (userData?.profile_picture) {
+		// Extract the file path from the public URL
+		const oldUrl = userData.profile_picture;
+		const bucketName = 'user-profileimg';
+		const urlParts = oldUrl.split(`${bucketName}/`);
+		if (urlParts.length > 1) {
+			const oldFilePath = urlParts[1];
+			await supabase.storage.from(bucketName).remove([oldFilePath]);
+		}
 	}
 
 	const timestamp = new Date().getTime();
@@ -58,6 +83,7 @@ exports.uploadProfilePicture = catchAsync(async (req, res, next) => {
 /*
  Search for users by name
  Returns partial user information for search results
+ GET /API/v1/users/search
  */
 exports.searchUsers = catchAsync(async (req, res, next) => {
 	const { query } = req.query;
@@ -99,6 +125,7 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
 /*
  Get prayer requests created by the authenticated user
  Includes request details and current status
+ GET /API/v1/users/prayer-requests
  */
 exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
@@ -113,11 +140,11 @@ exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 			text,
 			created_at,
 			anonymous,
-			owner,
+			owner_id,
 			photos
 		`
 		)
-		.eq('owner->>id', req.user.id)
+		.eq('owner_id', req.user.id)
 		.order('created_at', { ascending: false })
 		.range(offset, offset + limit - 1);
 
@@ -127,13 +154,16 @@ exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 	const { count, error: countError } = await supabase
 		.from('prayer_requests')
 		.select('*', { count: 'exact', head: true })
-		.eq('owner->>id', req.user.id);
+		.eq('owner_id', req.user.id);
 
 	if (countError) throw countError;
 
+	// Populate owner info for all prayer requests
+	const populatedRequests = await populateOwner(prayerRequests);
+
 	res.status(200).json({
 		success: true,
-		data: prayerRequests,
+		data: populatedRequests,
 		pagination: {
 			currentPage: parseInt(page),
 			totalPages: Math.ceil(count / limit),
@@ -147,54 +177,70 @@ exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 /*
  Get prayer requests the user has commented on
  Includes the prayer request details and user's comments
+ GET /API/v1/users/prayer-comments
  */
 exports.getUserPrayerComments = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
 	const offset = (page - 1) * limit;
 
-	// Get prayer requests where user has commented
-	// Since comments are stored as JSON arrays within prayer_requests,
-	// we need to filter where the comments array contains the user's ID
-	const { data: commentedRequests, error } = await supabase
-		.from('prayer_requests')
+	// Get user's comments from the prayer_request_comments table
+	const { data: userComments, error } = await supabase
+		.from('prayer_request_comments')
 		.select(
 			`
 			id,
-			title,
 			text,
 			created_at,
-			owner,
-			comments,
-			anonymous
+			prayer_request_id,
+			prayer_requests (
+				id,
+				title,
+				text,
+				created_at,
+				owner_id,
+				anonymous
+			)
 		`
 		)
-		.contains('comments', [{ user_id: req.user.id }])
+		.eq('user_id', req.user.id)
 		.order('created_at', { ascending: false })
 		.range(offset, offset + limit - 1);
 
 	if (error) throw error;
 
-	// Filter and format the results to only show user's comments
-	const formattedResults =
-		commentedRequests?.map((request) => ({
-			...request,
-			userComments:
-				request.comments?.filter(
-					(comment) => comment.user_id === req.user.id
-				) || [],
-		})) || [];
+	// Format the results to group by prayer request
+	const prayerRequestMap = new Map();
+	userComments?.forEach((comment) => {
+		const prId = comment.prayer_request_id;
+		if (!prayerRequestMap.has(prId)) {
+			prayerRequestMap.set(prId, {
+				...comment.prayer_requests,
+				userComments: [],
+			});
+		}
+		prayerRequestMap.get(prId).userComments.push({
+			id: comment.id,
+			text: comment.text,
+			created_at: comment.created_at,
+		});
+	});
+
+	const formattedResults = Array.from(prayerRequestMap.values());
+
+	// Populate owner info for all prayer requests
+	const populatedResults = await populateOwner(formattedResults);
 
 	// Get total count for pagination
 	const { count, error: countError } = await supabase
-		.from('prayer_requests')
+		.from('prayer_request_comments')
 		.select('*', { count: 'exact', head: true })
-		.contains('comments', [{ user_id: req.user.id }]);
+		.eq('user_id', req.user.id);
 
 	if (countError) throw countError;
 
 	res.status(200).json({
 		success: true,
-		data: formattedResults,
+		data: populatedResults,
 		pagination: {
 			currentPage: parseInt(page),
 			totalPages: Math.ceil((count || 0) / limit),
@@ -208,6 +254,7 @@ exports.getUserPrayerComments = catchAsync(async (req, res, next) => {
 /*
  Get events the user has attended or registered for
  Includes event details and attendance status
+ GET /API/v1/users/events
  */
 exports.getUserEvents = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10, status = 'all' } = req.query;
@@ -229,7 +276,8 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 				end_time,
 				location,
 				max_attendees,
-				status
+				status,
+				owner_id
 			)
 		`
 		)
@@ -247,6 +295,15 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 	);
 
 	if (error) throw error;
+
+	// Populate owner info for events
+	if (userEvents) {
+		for (let i = 0; i < userEvents.length; i++) {
+			if (userEvents[i].events) {
+				userEvents[i].events = await populateOwner(userEvents[i].events);
+			}
+		}
+	}
 
 	// Get total count for pagination
 	let countQuery = supabase
@@ -278,6 +335,7 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 /*
  Get sermon discussions the user has participated in
  Includes sermon details and user's discussion contributions
+ GET /API/v1/users/sermon-discussions
  */
 exports.getUserSermonDiscussions = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 10 } = req.query;
@@ -334,9 +392,13 @@ exports.getUserSermonDiscussions = catchAsync(async (req, res, next) => {
 /*
  Get comprehensive user profile information
  Includes basic profile data and activity summary
+ If userId param is provided, looks up that user's profile
+ Otherwise defaults to the authenticated user's profile
+ GET /API/v1/users/profile
  */
 exports.getUserProfile = catchAsync(async (req, res, next) => {
-	const userId = req.user.id;
+	// Use the provided userId param if available, otherwise default to authenticated user
+	const userId = req.params.userId || req.user.id;
 
 	// Get user basic information
 	const { data: user, error: userError } = await supabase
@@ -345,7 +407,12 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 		.eq('id', userId)
 		.single();
 
-	if (userError) throw userError;
+	if (userError) {
+		if (userError.code === 'PGRST116') {
+			return next(new AppError('User not found', 404));
+		}
+		throw userError;
+	}
 
 	// Get activity counts in parallel
 	const [
@@ -359,11 +426,11 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 		supabase
 			.from('prayer_requests')
 			.select('*', { count: 'exact', head: true })
-			.eq('owner->>id', userId),
+			.eq('owner_id', userId),
 		supabase
-			.from('prayer_requests')
+			.from('prayer_request_comments')
 			.select('*', { count: 'exact', head: true })
-			.contains('comments', [{ user_id: userId }]),
+			.eq('user_id', userId),
 		supabase
 			.from('event_attendees')
 			.select('*', { count: 'exact', head: true })
@@ -375,7 +442,7 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 		supabase
 			.from('events')
 			.select('*', { count: 'exact', head: true })
-			.eq('owner->>id', userId),
+			.eq('owner_id', userId),
 		supabase
 			.from('friendships')
 			.select('*', { count: 'exact', head: true })
@@ -400,6 +467,7 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 /*
  Get news feed containing all prayer requests and events
  Returns a combined feed of recent prayer requests and events
+ GET /API/v1/users/news-feed
  */
 exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	const { limit = 20 } = req.query;
@@ -422,15 +490,56 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	if (prayerRequestsResponse.error) throw prayerRequestsResponse.error;
 	if (eventsResponse.error) throw eventsResponse.error;
 
-	// Add type identifier to each item and combine
-	const prayerRequests = (prayerRequestsResponse.data || []).map((item) => ({
+	// Populate owner info for prayer requests
+	const populatedPrayerRequests = await populateOwner(prayerRequestsResponse.data || []);
+
+	// Populate owner info for events
+	const populatedEvents = await populateOwner(eventsResponse.data || []);
+
+	// Get like counts for prayer requests
+	let prayerRequestLikeMap = {};
+	if (populatedPrayerRequests.length > 0) {
+		const prayerRequestIds = populatedPrayerRequests.map((pr) => pr.id);
+		const { data: prLikes, error: prLikeError } = await supabase
+			.from('prayer_request_likes')
+			.select('prayer_request_id')
+			.in('prayer_request_id', prayerRequestIds);
+
+		if (prLikeError) throw prLikeError;
+
+		prLikes?.forEach((like) => {
+			prayerRequestLikeMap[like.prayer_request_id] = (prayerRequestLikeMap[like.prayer_request_id] || 0) + 1;
+		});
+	}
+
+	// Get like counts for events
+	let eventLikeMap = {};
+	if (populatedEvents.length > 0) {
+		const eventIds = populatedEvents.map((event) => event.id);
+		const { data: eventLikes, error: eventLikeError } = await supabase
+			.from('event_likes')
+			.select('event_id')
+			.in('event_id', eventIds);
+
+		if (eventLikeError) throw eventLikeError;
+
+		eventLikes?.forEach((like) => {
+			eventLikeMap[like.event_id] = (eventLikeMap[like.event_id] || 0) + 1;
+		});
+	}
+
+	// Add type identifier and like count to each item and combine
+	// Exclude comments array from feed items (comments are fetched separately on detail view)
+	const prayerRequests = populatedPrayerRequests.map(({ comments, ...item }) => ({
 		...item,
 		type: 'prayer_request',
+		likeCount: prayerRequestLikeMap[item.id] || 0,
 	}));
 
-	const events = (eventsResponse.data || []).map((item) => ({
+	const events = populatedEvents.map(({ comments, ...item }) => ({
 		...item,
 		type: 'event',
+		likeCount: eventLikeMap[item.id] || 0,
 	}));
 
 	// Combine and sort by creation date
@@ -458,6 +567,7 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 /*
  Send a friend request to another user
  Creates a pending friendship record
+ POST /API/v1/users/send-friend-request
  */
 exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 	const { userId } = req.body;
@@ -548,6 +658,7 @@ exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 /*
  Accept a friend request
  Updates the friendship status to 'accepted'
+ POST /API/v1/users/accept-friend-request
  */
 exports.acceptFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -586,6 +697,7 @@ exports.acceptFriendRequest = catchAsync(async (req, res, next) => {
 /*
  Reject a friend request
  Updates the friendship status to 'rejected'
+ POST /API/v1/users/reject-friend-request
  */
 exports.rejectFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -624,6 +736,7 @@ exports.rejectFriendRequest = catchAsync(async (req, res, next) => {
 /*
  Cancel a pending friend request
  Deletes the friendship record if user is the requester
+ POST /API/v1/users/cancel-friend-request
  */
 exports.cancelFriendRequest = catchAsync(async (req, res, next) => {
 	const { friendshipId } = req.params;
@@ -659,6 +772,7 @@ exports.cancelFriendRequest = catchAsync(async (req, res, next) => {
 /*
  Remove a friend
  Deletes the friendship record (unfriend)
+ POST /API/v1/users/remove-friend
  */
 exports.removeFriend = catchAsync(async (req, res, next) => {
 	const { userId } = req.params;
@@ -701,6 +815,7 @@ exports.removeFriend = catchAsync(async (req, res, next) => {
 /*
  Get user's friends list
  Returns all accepted friendships with user details
+ GET /API/v1/users/friends
  */
 exports.getFriends = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -772,6 +887,7 @@ exports.getFriends = catchAsync(async (req, res, next) => {
 /*
  Get pending friend requests received by the user
  Returns friend requests where user is the addressee
+ GET /API/v1/users/pending-friend-requests
  */
 exports.getPendingFriendRequests = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -843,6 +959,7 @@ exports.getPendingFriendRequests = catchAsync(async (req, res, next) => {
 /*
  Get friend requests sent by the user
  Returns friend requests where user is the requester
+ GET /API/v1/users/sent-friend-requests
  */
 exports.getSentFriendRequests = catchAsync(async (req, res, next) => {
 	const userId = req.user.id;
@@ -914,7 +1031,8 @@ exports.getSentFriendRequests = catchAsync(async (req, res, next) => {
 /*
  Get friendship status with a specific user
  Returns the friendship status between current user and target user
- */
+ GET /API/v1/users/friends/status/:userId
+*/
 exports.getFriendshipStatus = catchAsync(async (req, res, next) => {
 	const { userId } = req.params;
 	const currentUserId = req.user.id;
@@ -965,6 +1083,7 @@ exports.getFriendshipStatus = catchAsync(async (req, res, next) => {
 
 /*
  Return all the users in the database
+ GET /API/v1/users/all-users
 */
 exports.getAllUsers = catchAsync(async (req, res, next) => {
 	const { page = 1, limit = 20 } = req.query;

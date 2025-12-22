@@ -1,29 +1,13 @@
 const localLMAPI = require('../APIs/LocalLMAPI');
 
-// Default profile picture URL from Supabase storage
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const DEFAULT_PROFILE_PICTURE = `${SUPABASE_URL}/storage/v1/object/public/defaults/default_profile_pic.jpg`;
-
+/**
+ * Middleware to generate a title for prayer requests if not provided
+ * Uses AI to summarize the prayer request text into a short title
+ */
 const prayerRequestModifier = async (req, res, next) => {
 	try {
-		console.log("Body of request:", req.body)
+		console.log("Body of request:", req.body);
 		const user = req.user;
-		const isAnonymous = req.body.anonymous === 'true' || req.body.anonymous === true;
-
-		// Prepare owner info based on anonymous flag
-		if (isAnonymous) {
-			req.ownerInfo = {
-				id: user.id,
-				name: 'Anonymous',
-				profile_picture: DEFAULT_PROFILE_PICTURE,
-			};
-		} else {
-			req.ownerInfo = {
-				id: user.id,
-				name: user.full_name,
-				profile_picture: user.profile_picture,
-			};
-		}
 
 		// Check if title is provided and not empty
 		const hasTitle = req.body.title && req.body.title.trim() !== '';
@@ -65,19 +49,21 @@ const prayerRequestModifier = async (req, res, next) => {
 	} catch (error) {
 		// Log the error
 		console.error('Error generating prayer title:', error.message);
-		// If LM API fails, just continue with a default title "Pray for [user name]"
-		// only if anonymous is false
-		if (!req.body.anonymous || req.body.anonymous === 'false') {
-			//only use the users first name for the title
+		
+		// If LM API fails, use a default title based on anonymous status
+		const isAnonymous = req.body.anonymous === 'true' || req.body.anonymous === true;
+		
+		if (!isAnonymous) {
+			// Only use the user's first name for the title
 			const firstName = req.user.full_name.split(' ')[0];
 			req.body.title = 'Prayers needed for ' + firstName;
 		} else {
 			req.body.title = 'Prayers needed';
 		}
-		// The controller will use its fallback
+		
+		// Continue to the controller
 		next();
 	}
 };
 
 module.exports = prayerRequestModifier;
-

@@ -20,7 +20,7 @@ router.get('/my-events', eventController.getMyEvents);
 router.get('/attending', eventController.getAttendingEvents);
 
 // Search for locations
-router.get('/locations/search', eventController.searchLocations);
+router.get('/locations', eventController.getLocations);
 
 // Get a specific event by ID
 router.get('/:id', eventController.getEventById);

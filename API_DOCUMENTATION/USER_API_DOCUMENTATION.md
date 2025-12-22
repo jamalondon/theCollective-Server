@@ -109,11 +109,17 @@ curl -X GET \
 
 ## 3. Get User Profile
 
-**GET** `/profile`
+**GET** `/profile` or `/profile/:userId`
 
-Get comprehensive user profile with activity summary.
+Get comprehensive user profile with activity summary. If a `userId` parameter is provided, returns the profile of that specific user. Otherwise, returns the authenticated user's profile.
 
-### Request
+### URL Parameters
+
+| Parameter | Type   | Required | Description                                                                 |
+| --------- | ------ | -------- | --------------------------------------------------------------------------- |
+| `userId`  | string | No       | The ID of the user to look up. If not provided, defaults to authenticated user. |
+
+### Request (Own Profile)
 
 ```javascript
 fetch('/api/users/profile', {
@@ -124,11 +130,28 @@ fetch('/api/users/profile', {
 });
 ```
 
-### cURL Example
+### Request (Specific User Profile)
+
+```javascript
+fetch('/api/users/profile/123e4567-e89b-12d3-a456-426614174000', {
+	method: 'GET',
+	headers: {
+		Authorization: 'Bearer your-jwt-token',
+	},
+});
+```
+
+### cURL Examples
 
 ```bash
+# Get own profile
 curl -X GET \
   http://localhost:3000/api/users/profile \
+  -H "Authorization: Bearer your-jwt-token"
+
+# Get specific user's profile
+curl -X GET \
+  http://localhost:3000/api/users/profile/123e4567-e89b-12d3-a456-426614174000 \
   -H "Authorization: Bearer your-jwt-token"
 ```
 
@@ -137,22 +160,33 @@ curl -X GET \
 ```json
 {
 	"success": true,
-	"data": {
-		"user": {
-			"id": "user-id",
-			"username": "johndoe",
-			"name": "John Doe",
-			"profile_picture": "https://example.com/profile.jpg",
-			"date_of_birth": "1990-01-01",
-			"created_at": "2024-01-01T00:00:00Z"
-		},
-		"activitySummary": {
-			"prayerRequestsCreated": 5,
-			"prayerRequestsCommented": 12,
-			"eventsAttended": 3,
-			"sermonDiscussionsParticipated": 8
-		}
+	"user": {
+		"id": "user-id",
+		"username": "johndoe",
+		"full_name": "John Doe",
+		"profile_picture": "https://example.com/profile.jpg",
+		"date_of_birth": "1990-01-01",
+		"created_at": "2024-01-01T00:00:00Z"
+	},
+	"activitySummary": {
+		"prayerRequestsCreated": 5,
+		"prayerRequestsCommented": 12,
+		"eventsAttended": 3,
+		"sermonDiscussionsParticipated": 8,
+		"eventsCreated": 2,
+		"friends": 15
 	}
+}
+```
+
+### Error Responses
+
+#### 404 Not Found
+
+```json
+{
+	"status": "error",
+	"message": "User not found"
 }
 ```
 
@@ -520,9 +554,14 @@ All routes may return these error responses:
 ### Complete fetch example with error handling:
 
 ```javascript
-async function getUserProfile() {
+// Get own profile or a specific user's profile
+async function getUserProfile(userId = null) {
 	try {
-		const response = await fetch('/api/users/profile', {
+		const url = userId
+			? `/api/users/profile/${userId}`
+			: '/api/users/profile';
+
+		const response = await fetch(url, {
 			method: 'GET',
 			headers: {
 				Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -542,6 +581,10 @@ async function getUserProfile() {
 		throw error;
 	}
 }
+
+// Usage examples:
+// getUserProfile();                                      // Gets own profile
+// getUserProfile('123e4567-e89b-12d3-a456-426614174000'); // Gets specific user's profile
 
 async function uploadProfilePicture(file) {
 	try {

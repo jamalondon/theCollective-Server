@@ -19,8 +19,11 @@ router.post(
 // User search route
 router.get('/search', requireAuth, userController.searchUsers);
 
-// Get user profile with activity summary
-router.get('/profile', requireAuth, userController.getUserProfile);
+// Get all users
+router.get('/all-users', requireAuth, userController.getAllUsers);
+
+// Get user profile with activity summary (own profile or specific user by ID)
+router.get('/profile/:userId?', requireAuth, userController.getUserProfile);
 
 // Get user's prayer requests
 router.get(
@@ -48,9 +51,6 @@ router.get(
 
 // Get news feed with prayer requests and events
 router.get('/news-feed', requireAuth, userController.getNewsFeed);
-
-// Get all users
-router.get('/all-users', requireAuth, userController.getAllUsers);
 
 // Send a friend request
 router.post('/friends/request', requireAuth, userController.sendFriendRequest);

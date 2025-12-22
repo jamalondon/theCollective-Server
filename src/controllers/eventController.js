@@ -1,4 +1,5 @@
 const supabase = require('../supabase');
+const { populateOwner, populateUser } = require('../utils/populateUserInfo');
 
 // Create a new event
 const createEvent = async (req, res) => {
@@ -30,7 +31,7 @@ const createEvent = async (req, res) => {
 			});
 		}
 
-		// Create a new event with the current user as owner
+		// Create a new event with only the owner_id
 		const { data: event, error: createError } = await supabase
 			.from('events')
 			.insert([
@@ -39,12 +40,7 @@ const createEvent = async (req, res) => {
 					description,
 					location,
 					date: new Date(date).toISOString(),
-					owner: {
-						id: req.user.id,
-						name: req.user.full_name,
-						username: req.user.username,
-						profile_picture: req.user.profile_picture,
-					},
+					owner_id: req.user.id,
 					tags: tags || [],
 				},
 			])
@@ -81,7 +77,10 @@ const createEvent = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.status(201).send(eventWithDetails);
+		// Populate owner info
+		const populatedEvent = await populateOwner(eventWithDetails);
+
+		res.status(201).send(populatedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -97,7 +96,33 @@ const getAllEvents = async (req, res) => {
 
 		if (error) throw error;
 
-		res.send(events);
+		// Populate owner info for all events
+		const populatedEvents = await populateOwner(events);
+
+		// Get like counts for all events
+		if (populatedEvents && populatedEvents.length > 0) {
+			const eventIds = populatedEvents.map((event) => event.id);
+			
+			const { data: likeCounts, error: likeError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.in('event_id', eventIds);
+
+			if (likeError) throw likeError;
+
+			// Count likes per event
+			const likeCountMap = {};
+			likeCounts?.forEach((like) => {
+				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
+			});
+
+			// Add likeCount to each event
+			populatedEvents.forEach((event) => {
+				event.likeCount = likeCountMap[event.id] || 0;
+			});
+		}
+
+		res.send(populatedEvents);
 	} catch (err) {
 		res.status(500).send({ error: err.message });
 	}
@@ -109,11 +134,38 @@ const getMyEvents = async (req, res) => {
 		const { data: events, error } = await supabase
 			.from('events')
 			.select('*')
-			.eq('owner->>id', req.user.id)
+			.eq('owner_id', req.user.id)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
-		res.send(events);
+
+		// Populate owner info for all events
+		const populatedEvents = await populateOwner(events);
+
+		// Get like counts for all events
+		if (populatedEvents && populatedEvents.length > 0) {
+			const eventIds = populatedEvents.map((event) => event.id);
+			
+			const { data: likeCounts, error: likeError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.in('event_id', eventIds);
+
+			if (likeError) throw likeError;
+
+			// Count likes per event
+			const likeCountMap = {};
+			likeCounts?.forEach((like) => {
+				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
+			});
+
+			// Add likeCount to each event
+			populatedEvents.forEach((event) => {
+				event.likeCount = likeCountMap[event.id] || 0;
+			});
+		}
+
+		res.send(populatedEvents);
 	} catch (err) {
 		res.status(500).send({ error: err.message });
 	}
@@ -122,15 +174,57 @@ const getMyEvents = async (req, res) => {
 // Get events that the user is attending but not hosting
 const getAttendingEvents = async (req, res) => {
 	try {
+		// First get the event IDs the user is attending
+		const { data: attendeeRecords, error: attendeeError } = await supabase
+			.from('event_attendees')
+			.select('event_id')
+			.eq('user_id', req.user.id);
+
+		if (attendeeError) throw attendeeError;
+
+		const eventIds = attendeeRecords.map((record) => record.event_id);
+
+		if (eventIds.length === 0) {
+			return res.send([]);
+		}
+
+		// Get events where user is attending but not the owner
 		const { data: events, error } = await supabase
 			.from('events')
 			.select('*')
-			.not('owner->>id', 'eq', req.user.id)
-			.eq('event_attendees.user_id', req.user.id)
+			.in('id', eventIds)
+			.neq('owner_id', req.user.id)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
-		res.send(events);
+
+		// Populate owner info for all events
+		const populatedEvents = await populateOwner(events);
+
+		// Get like counts for all events
+		if (populatedEvents && populatedEvents.length > 0) {
+			const populatedEventIds = populatedEvents.map((event) => event.id);
+			
+			const { data: likeCounts, error: likeError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.in('event_id', populatedEventIds);
+
+			if (likeError) throw likeError;
+
+			// Count likes per event
+			const likeCountMap = {};
+			likeCounts?.forEach((like) => {
+				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
+			});
+
+			// Add likeCount to each event
+			populatedEvents.forEach((event) => {
+				event.likeCount = likeCountMap[event.id] || 0;
+			});
+		}
+
+		res.send(populatedEvents);
 	} catch (err) {
 		res.status(500).send({ error: err.message });
 	}
@@ -157,7 +251,33 @@ const getEventById = async (req, res) => {
 			return res.status(404).send({ error: 'Event not found' });
 		}
 
-		res.send(event);
+		// Get like count
+		const { count: likeCount } = await supabase
+			.from('event_likes')
+			.select('*', { count: 'exact', head: true })
+			.eq('event_id', req.params.id);
+
+		// Get comments for this event
+		const { data: comments, error: commentsError } = await supabase
+			.from('event_comments')
+			.select('*')
+			.eq('event_id', req.params.id)
+			.order('created_at', { ascending: true });
+
+		if (commentsError) throw commentsError;
+
+		// Populate user info for comments
+		const populatedComments = await populateUser(comments || []);
+
+		// Populate owner info
+		const populatedEvent = await populateOwner(event);
+
+		res.send({
+			...populatedEvent,
+			likeCount: likeCount || 0,
+			commentCount: populatedComments.length,
+			comments: populatedComments,
+		});
 	} catch (err) {
 		res.status(500).send({ error: err.message });
 	}
@@ -180,7 +300,7 @@ const updateEvent = async (req, res) => {
 			return res.status(404).send({ error: 'Event not found' });
 		}
 
-		if (existingEvent.owner.id !== req.user.id) {
+		if (existingEvent.owner_id !== req.user.id) {
 			return res
 				.status(403)
 				.send({ error: 'You can only update events you own' });
@@ -217,7 +337,10 @@ const updateEvent = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.send(eventWithDetails);
+		// Populate owner info
+		const populatedEvent = await populateOwner(eventWithDetails);
+
+		res.send(populatedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -280,7 +403,10 @@ const attendEvent = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.send(eventWithDetails);
+		// Populate owner info
+		const populatedEvent = await populateOwner(eventWithDetails);
+
+		res.send(populatedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -302,7 +428,7 @@ const cancelAttendance = async (req, res) => {
 		}
 
 		// Check if user is the owner
-		if (event.owner.id === req.user.id) {
+		if (event.owner_id === req.user.id) {
 			return res
 				.status(422)
 				.send({ error: 'Event owners cannot cancel their attendance' });
@@ -333,7 +459,10 @@ const cancelAttendance = async (req, res) => {
 
 		if (detailsError) throw detailsError;
 
-		res.send(eventWithDetails);
+		// Populate owner info
+		const populatedEvent = await populateOwner(eventWithDetails);
+
+		res.send(populatedEvent);
 	} catch (err) {
 		res.status(422).send({ error: err.message });
 	}
@@ -354,7 +483,7 @@ const deleteEvent = async (req, res) => {
 			return res.status(404).send({ error: 'Event not found' });
 		}
 
-		if (event.owner.id !== req.user.id) {
+		if (event.owner_id !== req.user.id) {
 			return res
 				.status(403)
 				.send({ error: 'You can only delete events you own' });
@@ -374,22 +503,13 @@ const deleteEvent = async (req, res) => {
 	}
 };
 
-// Search for locations
-const searchLocations = async (req, res) => {
-	const { query } = req.query;
-
-	if (!query) {
-		return res.status(400).send({ error: 'Search query is required' });
-	}
-
+// Get default locations
+const getLocations = async (req, res) => {
 	try {
 		const { data: locations, error } = await supabase
 			.from('locations')
-			.select('id, name, address, city, state')
-			.or(
-				`name.ilike.%${query}%,address.ilike.%${query}%,city.ilike.%${query}%`
-			)
-			.limit(10);
+			.select('id, name, address, city, state, country, latitude, longitude, zip')
+			.order('name', { ascending: true });
 
 		if (error) throw error;
 
@@ -397,8 +517,14 @@ const searchLocations = async (req, res) => {
 		const formattedLocations = locations.map((location) => ({
 			id: location.id,
 			name: location.name,
-			subtitle: `${location.city}, ${location.state}`,
 			address: location.address,
+			city: location.city,
+			state: location.state,
+			country: location.country,
+			latitude: location.latitude,
+			longitude: location.longitude,
+			zip: location.zip,
+			
 		}));
 
 		res.send(formattedLocations);
@@ -437,17 +563,13 @@ const addComment = async (req, res) => {
 			return res.status(404).json({ error: 'Event not found' });
 		}
 
-		// Insert comment into the database
+		// Insert comment with only user_id
 		const { data: comment, error: insertError } = await supabase
 			.from('event_comments')
 			.insert([
 				{
 					event_id: eventId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 					text,
 				},
 			])
@@ -456,7 +578,10 @@ const addComment = async (req, res) => {
 
 		if (insertError) throw insertError;
 
-		res.status(201).json({ comment });
+		// Populate user info
+		const populatedComment = await populateUser(comment);
+
+		res.status(201).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });
@@ -488,9 +613,12 @@ const getComments = async (req, res) => {
 
 		if (commentsError) throw commentsError;
 
+		// Populate user info for all comments
+		const populatedComments = await populateUser(comments);
+
 		res.status(200).json({
-			total: comments.length,
-			comments,
+			total: populatedComments.length,
+			comments: populatedComments,
 		});
 	} catch (err) {
 		console.error(err);
@@ -524,7 +652,7 @@ const updateComment = async (req, res) => {
 			return res.status(404).json({ error: 'Comment not found' });
 		}
 
-		if (existingComment.user.id !== user.id) {
+		if (existingComment.user_id !== user.id) {
 			return res
 				.status(403)
 				.json({ error: 'You can only edit your own comments' });
@@ -540,7 +668,10 @@ const updateComment = async (req, res) => {
 
 		if (updateError) throw updateError;
 
-		res.status(200).json({ comment: updatedComment });
+		// Populate user info
+		const populatedComment = await populateUser(updatedComment);
+
+		res.status(200).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });
@@ -567,7 +698,7 @@ const deleteComment = async (req, res) => {
 		// Check if event exists and get owner
 		const { data: event, error: eventFetchError } = await supabase
 			.from('events')
-			.select('owner')
+			.select('owner_id')
 			.eq('id', eventId)
 			.single();
 
@@ -576,8 +707,8 @@ const deleteComment = async (req, res) => {
 		}
 
 		// Allow deletion if user is comment owner OR event owner
-		const isCommentOwner = existingComment.user.id === user.id;
-		const isEventOwner = event.owner.id === user.id;
+		const isCommentOwner = existingComment.user_id === user.id;
+		const isEventOwner = event.owner_id === user.id;
 
 		if (!isCommentOwner && !isEventOwner) {
 			return res.status(403).json({
@@ -627,24 +758,20 @@ const likeEvent = async (req, res) => {
 			.from('event_likes')
 			.select('id')
 			.eq('event_id', eventId)
-			.eq('user->>id', user.id)
+			.eq('user_id', user.id)
 			.single();
 
 		if (existingLike) {
 			return res.status(400).json({ error: 'You have already liked this event' });
 		}
 
-		// Insert the like
+		// Insert the like with only user_id
 		const { data: like, error: insertError } = await supabase
 			.from('event_likes')
 			.insert([
 				{
 					event_id: eventId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 				},
 			])
 			.select()
@@ -658,9 +785,12 @@ const likeEvent = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('event_id', eventId);
 
+		// Populate user info
+		const populatedLike = await populateUser(like);
+
 		res.status(201).json({ 
 			message: 'Event liked successfully',
-			like,
+			like: populatedLike,
 			likeCount: count 
 		});
 	} catch (err) {
@@ -691,7 +821,7 @@ const unlikeEvent = async (req, res) => {
 			.from('event_likes')
 			.delete()
 			.eq('event_id', eventId)
-			.eq('user->>id', user.id);
+			.eq('user_id', user.id);
 
 		if (deleteError) throw deleteError;
 
@@ -736,9 +866,12 @@ const getEventLikes = async (req, res) => {
 
 		if (likesError) throw likesError;
 
+		// Populate user info for all likes
+		const populatedLikes = await populateUser(likes);
+
 		res.status(200).json({
-			total: likes.length,
-			likes,
+			total: populatedLikes.length,
+			likes: populatedLikes,
 		});
 	} catch (err) {
 		console.error(err);
@@ -772,24 +905,20 @@ const likeComment = async (req, res) => {
 			.from('event_comment_likes')
 			.select('id')
 			.eq('comment_id', commentId)
-			.eq('user->>id', user.id)
+			.eq('user_id', user.id)
 			.single();
 
 		if (existingLike) {
 			return res.status(400).json({ error: 'You have already liked this comment' });
 		}
 
-		// Insert the like
+		// Insert the like with only user_id
 		const { data: like, error: insertError } = await supabase
 			.from('event_comment_likes')
 			.insert([
 				{
 					comment_id: commentId,
-					user: {
-						id: user.id,
-						name: user.full_name,
-						profile_picture: user.profile_picture,
-					},
+					user_id: user.id,
 				},
 			])
 			.select()
@@ -803,9 +932,12 @@ const likeComment = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('comment_id', commentId);
 
+		// Populate user info
+		const populatedLike = await populateUser(like);
+
 		res.status(201).json({ 
 			message: 'Comment liked successfully',
-			like,
+			like: populatedLike,
 			likeCount: count 
 		});
 	} catch (err) {
@@ -836,7 +968,7 @@ const unlikeComment = async (req, res) => {
 			.from('event_comment_likes')
 			.delete()
 			.eq('comment_id', commentId)
-			.eq('user->>id', user.id);
+			.eq('user_id', user.id);
 
 		if (deleteError) throw deleteError;
 
@@ -881,9 +1013,12 @@ const getCommentLikes = async (req, res) => {
 
 		if (likesError) throw likesError;
 
+		// Populate user info for all likes
+		const populatedLikes = await populateUser(likes);
+
 		res.status(200).json({
-			total: likes.length,
-			likes,
+			total: populatedLikes.length,
+			likes: populatedLikes,
 		});
 	} catch (err) {
 		console.error(err);
@@ -901,7 +1036,7 @@ module.exports = {
 	attendEvent,
 	cancelAttendance,
 	deleteEvent,
-	searchLocations,
+	getLocations,
 	// Comment controllers //
 	addComment,
 	getComments,

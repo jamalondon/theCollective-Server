@@ -84,7 +84,7 @@ Manages church events, attendance, and scheduling.
 - `GET /` - Get all events
 - `GET /my-events` - Get user's created events
 - `GET /attending` - Get events user is attending
-- `GET /locations/search` - Search event locations
+- `GET /locations` - Get default locations
 - `GET /:id` - Get event by ID
 - `PUT /:id/update` - Update event
 - `POST /:id/attend` - Attend event
