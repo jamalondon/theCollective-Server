@@ -1,4 +1,5 @@
-const localLMAPI = require('../APIs/LocalLMAPI');
+const { GoogleGenAI } = require("@google/genai");
+
 
 /**
  * Middleware to generate a title for prayer requests if not provided
@@ -6,6 +7,9 @@ const localLMAPI = require('../APIs/LocalLMAPI');
  */
 const prayerRequestModifier = async (req, res, next) => {
 	try {
+		const ai = new GoogleGenAI({});
+
+		
 		console.log("Body of request:", req.body);
 		const user = req.user;
 
@@ -17,6 +21,7 @@ const prayerRequestModifier = async (req, res, next) => {
 			req.body.title = req.body.title.trim();
 			return next();
 		}
+
 		
 		// Extract prayer request text from the request body
 		const prayerText = req.body.text;
@@ -26,31 +31,24 @@ const prayerRequestModifier = async (req, res, next) => {
 			return next();
 		}
         
-		// Call the local LM API to generate a title
-		const response = await localLMAPI.post("/v1/chat/completions", {
-			model: 'openai/gpt-oss-20b',
-			messages: [
-				{
-					role: 'system',
-					content: 'You are to summarize the text that is given to you in as little words as possible. The summary will be the title of a social media post so try to make it make sense. DO NOT EXCEED 6 words'
-				},
-				{
-					role: 'user',
-					content: prayerText.trim()
+		// Call the Gemini API to generate a title, only wait 5 seconds
+		const response = await ai.models.generateContent({
+			model: "gemini-2.5-flash",
+			contents: prayerText.trim(),
+			config: {
+				systemInstruction: "You are to summarize the text that is given to you in as little words as possible. The summary will be the title of a social media post so try to make it make sense. DO NOT EXCEED 6 words",
+				thinking_config: {
+					thinking_budget: 0
 				}
-			]
-		});
-		
+			  },
+		  });
 		// Extract the generated title from the response
-		const generatedTitle = response.data.choices[0].message.content.trim();
+		const generatedTitle = response.text.trim();
 		req.body.title = generatedTitle;
-		
 		next();
 	} catch (error) {
-		// Log the error
-		console.error('Error generating prayer title:', error.message);
-		
-		// If LM API fails, use a default title based on anonymous status
+		console.error('Error generating prayer title:', error.message); 
+
 		const isAnonymous = req.body.anonymous === 'true' || req.body.anonymous === true;
 		
 		if (!isAnonymous) {
@@ -60,8 +58,6 @@ const prayerRequestModifier = async (req, res, next) => {
 		} else {
 			req.body.title = 'Prayers needed';
 		}
-		
-		// Continue to the controller
 		next();
 	}
 };

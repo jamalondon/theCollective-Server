@@ -1,5 +1,4 @@
 const supabase = require('../supabase');
-const localLMAPI = require('../APIs/LocalLMAPI');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
 const { sendPrayerRequestCreatedPush } = require('../utils/expoPush');
 
@@ -773,20 +772,6 @@ exports.getCommentLikes = async (req, res) => {
 			total: populatedLikes.length,
 			likes: populatedLikes,
 		});
-	} catch (err) {
-		console.error(err);
-		res.status(500).json({ error: err.message });
-	}
-};
-
-/*
-Test to make sure the LocalLM is running
-GET /API/v1/prayer-requests/test-local-lm
-*/
-exports.testLocalLM = async (req, res) => {
-	try {
-		const response = await localLMAPI.get('/v1/models');
-		res.status(200).json({ message: 'LocalLM is running', response: response.data });
 	} catch (err) {
 		console.error(err);
 		res.status(500).json({ error: err.message });

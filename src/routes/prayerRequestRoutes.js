@@ -20,9 +20,6 @@ router.post(
 // GET /API/v1/prayer-requests
 router.get('/', prayerRequestController.getPrayerRequests);
 
-// Test to make sure the LocalLM is running
-router.get('/test-local-lm', prayerRequestController.testLocalLM);
-
 // GET /API/v1/prayer-requests/:id - Get a single prayer request
 router.get('/:id', prayerRequestController.getPrayerRequest);
 
