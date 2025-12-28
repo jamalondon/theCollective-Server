@@ -471,6 +471,7 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
  */
 exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	const { limit = 20 } = req.query;
+	const user = req.user; // from requireAuth middleware
 
 	// Fetch prayer requests and events in parallel
 	const [prayerRequestsResponse, eventsResponse] = await Promise.all([
@@ -496,8 +497,9 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	// Populate owner info for events
 	const populatedEvents = await populateOwner(eventsResponse.data || []);
 
-	// Get like counts for prayer requests
+	// Get like counts and user's likes for prayer requests
 	let prayerRequestLikeMap = {};
+	let userPrayerRequestLikes = new Set();
 	if (populatedPrayerRequests.length > 0) {
 		const prayerRequestIds = populatedPrayerRequests.map((pr) => pr.id);
 		const { data: prLikes, error: prLikeError } = await supabase
@@ -510,10 +512,24 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 		prLikes?.forEach((like) => {
 			prayerRequestLikeMap[like.prayer_request_id] = (prayerRequestLikeMap[like.prayer_request_id] || 0) + 1;
 		});
+
+		// Get user's likes for prayer requests
+		const { data: userPrLikes, error: userPrLikeError } = await supabase
+			.from('prayer_request_likes')
+			.select('prayer_request_id')
+			.eq('user_id', user.id)
+			.in('prayer_request_id', prayerRequestIds);
+
+		if (userPrLikeError) throw userPrLikeError;
+
+		userPrLikes?.forEach((like) => {
+			userPrayerRequestLikes.add(like.prayer_request_id);
+		});
 	}
 
-	// Get like counts for events
+	// Get like counts and user's likes for events
 	let eventLikeMap = {};
+	let userEventLikes = new Set();
 	if (populatedEvents.length > 0) {
 		const eventIds = populatedEvents.map((event) => event.id);
 		const { data: eventLikes, error: eventLikeError } = await supabase
@@ -526,20 +542,35 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 		eventLikes?.forEach((like) => {
 			eventLikeMap[like.event_id] = (eventLikeMap[like.event_id] || 0) + 1;
 		});
+
+		// Get user's likes for events
+		const { data: userEvLikes, error: userEvLikeError } = await supabase
+			.from('event_likes')
+			.select('event_id')
+			.eq('user_id', user.id)
+			.in('event_id', eventIds);
+
+		if (userEvLikeError) throw userEvLikeError;
+
+		userEvLikes?.forEach((like) => {
+			userEventLikes.add(like.event_id);
+		});
 	}
 
-	// Add type identifier and like count to each item and combine
+	// Add type identifier, like count, and likedByUser to each item and combine
 	// Exclude comments array from feed items (comments are fetched separately on detail view)
 	const prayerRequests = populatedPrayerRequests.map(({ comments, ...item }) => ({
 		...item,
 		type: 'prayer_request',
 		likeCount: prayerRequestLikeMap[item.id] || 0,
+		likedByUser: userPrayerRequestLikes.has(item.id),
 	}));
 
 	const events = populatedEvents.map(({ comments, ...item }) => ({
 		...item,
 		type: 'event',
 		likeCount: eventLikeMap[item.id] || 0,
+		likedByUser: userEventLikes.has(item.id),
 	}));
 
 	// Combine and sort by creation date

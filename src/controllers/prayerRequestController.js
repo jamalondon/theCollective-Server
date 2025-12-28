@@ -98,6 +98,8 @@ exports.createPrayerRequest = async (req, res) => {
 
 exports.getPrayerRequests = async (req, res) => {
 	try {
+		const user = req.user; // from optionalAuth middleware (may be undefined)
+		
 		const { data, error } = await supabase
 			.from('prayer_requests')
 			.select('*')
@@ -108,7 +110,7 @@ exports.getPrayerRequests = async (req, res) => {
 		// Populate owner info for all prayer requests
 		const populatedRequests = await populateOwner(data);
 
-		// Get like counts for all prayer requests
+		// Get like counts and user's likes for all prayer requests
 		if (populatedRequests && populatedRequests.length > 0) {
 			const prayerRequestIds = populatedRequests.map((pr) => pr.id);
 			
@@ -126,9 +128,26 @@ exports.getPrayerRequests = async (req, res) => {
 				likeCountMap[like.prayer_request_id] = (likeCountMap[like.prayer_request_id] || 0) + 1;
 			});
 
-			// Add likeCount to each prayer request
+			// Get user's likes if authenticated
+			let userLikedSet = new Set();
+			if (user) {
+				const { data: userLikes, error: userLikesError } = await supabase
+					.from('prayer_request_likes')
+					.select('prayer_request_id')
+					.eq('user_id', user.id)
+					.in('prayer_request_id', prayerRequestIds);
+
+				if (userLikesError) throw userLikesError;
+
+				userLikes?.forEach((like) => {
+					userLikedSet.add(like.prayer_request_id);
+				});
+			}
+
+			// Add likeCount and likedByUser to each prayer request
 			populatedRequests.forEach((pr) => {
 				pr.likeCount = likeCountMap[pr.id] || 0;
+				pr.likedByUser = userLikedSet.has(pr.id);
 			});
 		}
 
@@ -148,6 +167,7 @@ exports.getPrayerRequests = async (req, res) => {
  */
 exports.getPrayerRequest = async (req, res) => {
 	try {
+		const user = req.user; // from optionalAuth middleware (may be undefined)
 		const { id } = req.params;
 
 		// Fetch the prayer request
@@ -166,6 +186,19 @@ exports.getPrayerRequest = async (req, res) => {
 			.from('prayer_request_likes')
 			.select('*', { count: 'exact', head: true })
 			.eq('prayer_request_id', id);
+
+		// Check if user has liked this prayer request
+		let likedByUser = false;
+		if (user) {
+			const { data: userLike } = await supabase
+				.from('prayer_request_likes')
+				.select('id')
+				.eq('prayer_request_id', id)
+				.eq('user_id', user.id)
+				.single();
+
+			likedByUser = !!userLike;
+		}
 
 		// Get comments for this prayer request
 		const { data: comments, error: commentsError } = await supabase
@@ -186,6 +219,7 @@ exports.getPrayerRequest = async (req, res) => {
 			prayerRequest: {
 				...populatedRequest,
 				likeCount: likeCount || 0,
+				likedByUser,
 				commentCount: populatedComments.length,
 				comments: populatedComments,
 			},

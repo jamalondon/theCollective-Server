@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const prayerRequestController = require('../controllers/prayerRequestController');
 const requireAuth = require('../middlewares/requireAuth');
+const { optionalAuth } = require('../middlewares/requireAuth');
 const prayerRequestModifier = require('../middlewares/prayerRequestModifier');
 
 // Set up multer for file uploads (memory storage for direct upload to Supabase)
@@ -18,10 +19,10 @@ router.post(
 );
 
 // GET /API/v1/prayer-requests
-router.get('/', prayerRequestController.getPrayerRequests);
+router.get('/', optionalAuth, prayerRequestController.getPrayerRequests);
 
 // GET /API/v1/prayer-requests/:id - Get a single prayer request
-router.get('/:id', prayerRequestController.getPrayerRequest);
+router.get('/:id', optionalAuth, prayerRequestController.getPrayerRequest);
 
 // DELETE /API/v1/prayer-request/:id
 router.delete('/:id', requireAuth, prayerRequestController.deletePrayerRequest);

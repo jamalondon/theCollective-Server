@@ -89,6 +89,8 @@ const createEvent = async (req, res) => {
 // Get all events
 const getAllEvents = async (req, res) => {
 	try {
+		const user = req.user; // from requireAuth middleware
+		
 		const { data: events, error } = await supabase
 			.from('events')
 			.select('*')
@@ -99,7 +101,7 @@ const getAllEvents = async (req, res) => {
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
 
-		// Get like counts for all events
+		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
 			const eventIds = populatedEvents.map((event) => event.id);
 			
@@ -116,9 +118,24 @@ const getAllEvents = async (req, res) => {
 				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
 			});
 
-			// Add likeCount to each event
+			// Get user's likes
+			const { data: userLikes, error: userLikesError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.eq('user_id', user.id)
+				.in('event_id', eventIds);
+
+			if (userLikesError) throw userLikesError;
+
+			const userLikedSet = new Set();
+			userLikes?.forEach((like) => {
+				userLikedSet.add(like.event_id);
+			});
+
+			// Add likeCount and likedByUser to each event
 			populatedEvents.forEach((event) => {
 				event.likeCount = likeCountMap[event.id] || 0;
+				event.likedByUser = userLikedSet.has(event.id);
 			});
 		}
 
@@ -131,10 +148,12 @@ const getAllEvents = async (req, res) => {
 // Get events owned by the current user
 const getMyEvents = async (req, res) => {
 	try {
+		const user = req.user; // from requireAuth middleware
+		
 		const { data: events, error } = await supabase
 			.from('events')
 			.select('*')
-			.eq('owner_id', req.user.id)
+			.eq('owner_id', user.id)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
@@ -142,7 +161,7 @@ const getMyEvents = async (req, res) => {
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
 
-		// Get like counts for all events
+		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
 			const eventIds = populatedEvents.map((event) => event.id);
 			
@@ -159,9 +178,24 @@ const getMyEvents = async (req, res) => {
 				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
 			});
 
-			// Add likeCount to each event
+			// Get user's likes
+			const { data: userLikes, error: userLikesError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.eq('user_id', user.id)
+				.in('event_id', eventIds);
+
+			if (userLikesError) throw userLikesError;
+
+			const userLikedSet = new Set();
+			userLikes?.forEach((like) => {
+				userLikedSet.add(like.event_id);
+			});
+
+			// Add likeCount and likedByUser to each event
 			populatedEvents.forEach((event) => {
 				event.likeCount = likeCountMap[event.id] || 0;
+				event.likedByUser = userLikedSet.has(event.id);
 			});
 		}
 
@@ -174,11 +208,13 @@ const getMyEvents = async (req, res) => {
 // Get events that the user is attending but not hosting
 const getAttendingEvents = async (req, res) => {
 	try {
+		const user = req.user; // from requireAuth middleware
+		
 		// First get the event IDs the user is attending
 		const { data: attendeeRecords, error: attendeeError } = await supabase
 			.from('event_attendees')
 			.select('event_id')
-			.eq('user_id', req.user.id);
+			.eq('user_id', user.id);
 
 		if (attendeeError) throw attendeeError;
 
@@ -193,7 +229,7 @@ const getAttendingEvents = async (req, res) => {
 			.from('events')
 			.select('*')
 			.in('id', eventIds)
-			.neq('owner_id', req.user.id)
+			.neq('owner_id', user.id)
 			.order('date', { ascending: true });
 
 		if (error) throw error;
@@ -201,7 +237,7 @@ const getAttendingEvents = async (req, res) => {
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
 
-		// Get like counts for all events
+		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
 			const populatedEventIds = populatedEvents.map((event) => event.id);
 			
@@ -218,9 +254,24 @@ const getAttendingEvents = async (req, res) => {
 				likeCountMap[like.event_id] = (likeCountMap[like.event_id] || 0) + 1;
 			});
 
-			// Add likeCount to each event
+			// Get user's likes
+			const { data: userLikes, error: userLikesError } = await supabase
+				.from('event_likes')
+				.select('event_id')
+				.eq('user_id', user.id)
+				.in('event_id', populatedEventIds);
+
+			if (userLikesError) throw userLikesError;
+
+			const userLikedSet = new Set();
+			userLikes?.forEach((like) => {
+				userLikedSet.add(like.event_id);
+			});
+
+			// Add likeCount and likedByUser to each event
 			populatedEvents.forEach((event) => {
 				event.likeCount = likeCountMap[event.id] || 0;
+				event.likedByUser = userLikedSet.has(event.id);
 			});
 		}
 
@@ -233,6 +284,8 @@ const getAttendingEvents = async (req, res) => {
 // Get a specific event by ID
 const getEventById = async (req, res) => {
 	try {
+		const user = req.user; // from requireAuth middleware
+		
 		const { data: event, error } = await supabase
 			.from('events')
 			.select(
@@ -257,6 +310,16 @@ const getEventById = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('event_id', req.params.id);
 
+		// Check if user has liked this event
+		const { data: userLike } = await supabase
+			.from('event_likes')
+			.select('id')
+			.eq('event_id', req.params.id)
+			.eq('user_id', user.id)
+			.single();
+
+		const likedByUser = !!userLike;
+
 		// Get comments for this event
 		const { data: comments, error: commentsError } = await supabase
 			.from('event_comments')
@@ -275,6 +338,7 @@ const getEventById = async (req, res) => {
 		res.send({
 			...populatedEvent,
 			likeCount: likeCount || 0,
+			likedByUser,
 			commentCount: populatedComments.length,
 			comments: populatedComments,
 		});

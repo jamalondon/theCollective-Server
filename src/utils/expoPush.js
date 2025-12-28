@@ -87,6 +87,7 @@ exports.sendPrayerRequestCreatedPush = async (prayerRequestRow) => {
 		title,
 		body,
 		data: { type: 'prayer_request', id: prayerRequestRow?.id },
+		badge: 1,
 	}));
 
 	await sendExpoPushMessages(messages);
