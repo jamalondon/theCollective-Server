@@ -7,3 +7,5 @@ Postman_Bible_API_Collection.json
 FRIENDS_SETUP.md
 friendships_migration.sql
 database/
+
+tests/

@@ -1,6 +1,10 @@
 const supabase = require('../supabase');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
 const { sendPrayerRequestCreatedPush } = require('../utils/expoPush');
+const { 
+	sendPrayerRequestLikeNotification, 
+	sendPrayerRequestCommentNotification 
+} = require('../services/notificationService');
 
 
 // Prayer Request Controllers
@@ -344,6 +348,11 @@ exports.addComment = async (req, res) => {
 		// Populate user info
 		const populatedComment = await populateUser(comment);
 
+		// Fire-and-forget notification to prayer request owner (do not block response)
+		sendPrayerRequestCommentNotification(prayerRequest, comment, user).catch((e) => {
+			console.error('Prayer request comment notification failed:', e?.message || e);
+		});
+
 		res.status(201).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
@@ -560,6 +569,11 @@ exports.likePrayerRequest = async (req, res) => {
 
 		// Populate user info
 		const populatedLike = await populateUser(like);
+
+		// Fire-and-forget notification to prayer request owner (do not block response)
+		sendPrayerRequestLikeNotification(prayerRequest, like, user).catch((e) => {
+			console.error('Prayer request like notification failed:', e?.message || e);
+		});
 
 		res.status(201).json({ 
 			message: 'Prayer request liked successfully',

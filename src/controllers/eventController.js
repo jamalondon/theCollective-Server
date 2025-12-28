@@ -1,5 +1,10 @@
 const supabase = require('../supabase');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
+const { 
+	sendEventCreatedNotification,
+	sendEventLikeNotification,
+	sendEventCommentNotification 
+} = require('../services/notificationService');
 
 // Create a new event
 const createEvent = async (req, res) => {
@@ -79,6 +84,11 @@ const createEvent = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(eventWithDetails);
+
+		// Fire-and-forget notification to followers (do not block response)
+		sendEventCreatedNotification(event, req.user).catch((e) => {
+			console.error('Event creation notification failed:', e?.message || e);
+		});
 
 		res.status(201).send(populatedEvent);
 	} catch (err) {
@@ -645,6 +655,11 @@ const addComment = async (req, res) => {
 		// Populate user info
 		const populatedComment = await populateUser(comment);
 
+		// Fire-and-forget notification to event owner (do not block response)
+		sendEventCommentNotification(event, comment, user).catch((e) => {
+			console.error('Event comment notification failed:', e?.message || e);
+		});
+
 		res.status(201).json({ comment: populatedComment });
 	} catch (err) {
 		console.error(err);
@@ -851,6 +866,11 @@ const likeEvent = async (req, res) => {
 
 		// Populate user info
 		const populatedLike = await populateUser(like);
+
+		// Fire-and-forget notification to event owner (do not block response)
+		sendEventLikeNotification(event, like, user).catch((e) => {
+			console.error('Event like notification failed:', e?.message || e);
+		});
 
 		res.status(201).json({ 
 			message: 'Event liked successfully',

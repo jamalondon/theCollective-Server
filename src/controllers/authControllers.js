@@ -3,6 +3,9 @@ const supabase = require('../supabase');
 const { hashPassword, comparePassword } = require('../supabaseSchemas');
 const AppError = require('../utils/AppError');
 const { startVerification, checkVerification } = require('../utils/twilio');
+const {
+	createDefaultPreferences,
+} = require('./notificationPreferencesController');
 
 // Get the Supabase project URL from the client
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -61,6 +64,14 @@ exports.signup = async (req, res, next) => {
 			.single();
 
 		if (createError) throw createError;
+
+		// Create default notification preferences for the new user
+		createDefaultPreferences(newUser.id).catch((e) => {
+			console.error(
+				'Failed to create default notification preferences:',
+				e?.message || e
+			);
+		});
 
 		// If no phone number provided, user is immediately ready to use (no verification needed)
 		if (!phoneNumber) {
@@ -264,7 +275,6 @@ exports.startVerify = async (req, res, next) => {
 			.select('id, verified')
 			.eq('phone_number', phoneNumber)
 			.single();
-
 
 		if (findError || !user) {
 			return next(new AppError('No user found with this phone number', 404));
