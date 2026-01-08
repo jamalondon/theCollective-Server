@@ -234,36 +234,6 @@ const validatePushMessage = (message) => {
 	return true;
 };
 
-/**
- * Broadcast: new prayer request created.
- * Sends to all active tokens in push_tokens.
- */
-exports.sendPrayerRequestCreatedPush = async (prayerRequestRow) => {
-	const tokens = await fetchActiveTokens();
-	if (!tokens.length) return { sent: 0 };
-
-	const title = 'New prayer request';
-	const body = prayerRequestRow?.anonymous
-		? 'A new prayer request was posted'
-		: prayerRequestRow?.title || 'A new prayer request was posted';
-
-	const messages = tokens.map((to) => ({
-		to,
-		sound: 'default',
-		title,
-		body,
-		data: { 
-			route: `/prayer-request/${prayerRequestRow?.id}`,
-			type: 'prayer_request', 
-			id: prayerRequestRow?.id 
-		},
-		badge: 1,
-	}));
-
-	const result = await sendExpoPushMessages(messages);
-	return result;
-};
-
 // Export enhanced functions
 module.exports = {
 	sendExpoPushMessages,
@@ -272,7 +242,5 @@ module.exports = {
 	validatePushMessage,
 	disableToken,
 	isProbablyExpoPushToken,
-	// Legacy export for backward compatibility
-	sendPrayerRequestCreatedPush: exports.sendPrayerRequestCreatedPush
 };
 

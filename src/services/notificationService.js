@@ -9,6 +9,7 @@ const { sendExpoPushMessages } = require('../utils/expoPush');
 // Notification type constants
 const NOTIFICATION_TYPES = {
 	EVENT_CREATED: 'event_created',
+	PRAYER_REQUEST_CREATED: 'prayer_request_created',
 	PRAYER_REQUEST_LIKE: 'prayer_request_like',
 	PRAYER_REQUEST_COMMENT: 'prayer_request_comment',
 	EVENT_LIKE: 'event_like',
@@ -36,6 +37,24 @@ function buildNotificationMessage(type, context) {
 					actorId: actor.id,
 				},
 			};
+
+		case NOTIFICATION_TYPES.PRAYER_REQUEST_CREATED: {
+			const isAnonymous = !!resource?.anonymous;
+			return {
+				title: isAnonymous
+					? 'New prayer request'
+					: `${actor.full_name} posted a prayer request`,
+				body: isAnonymous
+					? 'A new prayer request was posted'
+					: resource.title || 'A new prayer request was posted',
+				data: {
+					route: `/prayer-request/${resource.id}`,
+					type: 'prayer_request',
+					id: resource.id,
+					actorId: actor.id,
+				},
+			};
+		}
 
 		case NOTIFICATION_TYPES.PRAYER_REQUEST_LIKE:
 			return {
@@ -103,6 +122,30 @@ function buildNotificationMessage(type, context) {
 }
 
 /**
+ * Get IDs of accepted friends for a user (from friendships table).
+ * A friendship can be in either direction (requester/addressee).
+ * @param {string} userId
+ * @returns {Promise<string[]>}
+ */
+async function getAcceptedFriendIds(userId) {
+	if (!userId) return [];
+
+	const { data: friendships, error } = await supabase
+		.from('friendships')
+		.select('requester_id, addressee_id')
+		.eq('status', 'accepted')
+		.or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+
+	if (error) throw error;
+
+	const ids = (friendships || []).map((f) =>
+		f.requester_id === userId ? f.addressee_id : f.requester_id
+	);
+
+	return [...new Set(ids)].filter(Boolean);
+}
+
+/**
  * Get recipients for a notification based on type and context
  * @param {string} type - Notification type
  * @param {Object} context - Context data
@@ -115,14 +158,13 @@ async function getNotificationRecipients(type, context) {
 	try {
 		switch (type) {
 			case NOTIFICATION_TYPES.EVENT_CREATED:
-				// Get followers of the event creator
-				const { data: followers, error: followersError } = await supabase
-					.from('user_followers')
-					.select('follower_id')
-					.eq('following_id', actor.id);
+				// Notify the creator's accepted friends
+				recipients = await getAcceptedFriendIds(actor.id);
+				break;
 
-				if (followersError) throw followersError;
-				recipients = followers.map((f) => f.follower_id);
+			case NOTIFICATION_TYPES.PRAYER_REQUEST_CREATED:
+				// Notify the poster's accepted friends
+				recipients = await getAcceptedFriendIds(actor.id);
 				break;
 
 			case NOTIFICATION_TYPES.PRAYER_REQUEST_LIKE:
@@ -174,6 +216,7 @@ async function filterRecipientsByPreferences(userIds, type) {
 			case NOTIFICATION_TYPES.EVENT_CREATED:
 				categoryColumn = 'event_notifications';
 				break;
+			case NOTIFICATION_TYPES.PRAYER_REQUEST_CREATED:
 			case NOTIFICATION_TYPES.PRAYER_REQUEST_LIKE:
 			case NOTIFICATION_TYPES.PRAYER_REQUEST_COMMENT:
 				categoryColumn = 'prayer_notifications';
@@ -184,20 +227,29 @@ async function filterRecipientsByPreferences(userIds, type) {
 				break;
 		}
 
-		// Get users with notifications enabled for this category
+		// Get preference rows for these users (some users may not have a row yet)
 		const { data: preferences, error } = await supabase
 			.from('user_notification_preferences')
-			.select('user_id')
+			.select(`user_id, notifications_enabled, ${categoryColumn}`)
 			.in('user_id', userIds)
-			.eq('notifications_enabled', true)
-			.eq(categoryColumn, true);
+			.eq('notifications_enabled', true);
 
 		if (error) {
 			console.error('Error filtering recipients by preferences:', error);
 			return userIds; // Return all recipients if preference check fails
 		}
 
-		return preferences.map((p) => p.user_id);
+		const enabledByPrefs = (preferences || [])
+			.filter((p) => p?.[categoryColumn] === true)
+			.map((p) => p.user_id);
+
+		// If a user has no preferences row yet, default to "enabled"
+		const usersWithPrefsRow = new Set(
+			(preferences || []).map((p) => p.user_id)
+		);
+		const missingPrefs = userIds.filter((id) => !usersWithPrefsRow.has(id));
+
+		return [...new Set([...enabledByPrefs, ...missingPrefs])];
 	} catch (error) {
 		console.error('Error in filterRecipientsByPreferences:', error);
 		return userIds; // Return all recipients if filtering fails
@@ -321,7 +373,7 @@ async function sendNotification(type, context) {
 }
 
 /**
- * Send event created notification to followers
+ * Send event created notification to creator's friends
  * @param {Object} event - Event object
  * @param {Object} creator - Creator user object
  */
@@ -329,6 +381,18 @@ async function sendEventCreatedNotification(event, creator) {
 	return sendNotification(NOTIFICATION_TYPES.EVENT_CREATED, {
 		actor: creator,
 		resource: event,
+	});
+}
+
+/**
+ * Send prayer request created notification to poster's friends
+ * @param {Object} prayerRequest - Prayer request object
+ * @param {Object} creator - Creator user object
+ */
+async function sendPrayerRequestCreatedNotification(prayerRequest, creator) {
+	return sendNotification(NOTIFICATION_TYPES.PRAYER_REQUEST_CREATED, {
+		actor: creator,
+		resource: prayerRequest,
 	});
 }
 
@@ -395,6 +459,7 @@ async function sendEventCommentNotification(event, comment, actor) {
 module.exports = {
 	NOTIFICATION_TYPES,
 	sendEventCreatedNotification,
+	sendPrayerRequestCreatedNotification,
 	sendPrayerRequestLikeNotification,
 	sendPrayerRequestCommentNotification,
 	sendEventLikeNotification,
@@ -404,4 +469,5 @@ module.exports = {
 	getNotificationRecipients,
 	filterRecipientsByPreferences,
 	getActivePushTokens,
+	getAcceptedFriendIds,
 };

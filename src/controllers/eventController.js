@@ -629,7 +629,7 @@ const addComment = async (req, res) => {
 		// Check if event exists
 		const { data: event, error: fetchError } = await supabase
 			.from('events')
-			.select('id')
+			.select('id, owner_id, title')
 			.eq('id', eventId)
 			.single();
 
@@ -675,7 +675,7 @@ const getComments = async (req, res) => {
 		// Check if event exists
 		const { data: event, error: fetchError } = await supabase
 			.from('events')
-			.select('id')
+			.select('id, owner_id, title')
 			.eq('id', eventId)
 			.single();
 

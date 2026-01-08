@@ -1,11 +1,10 @@
 const supabase = require('../supabase');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
-const { sendPrayerRequestCreatedPush } = require('../utils/expoPush');
-const { 
-	sendPrayerRequestLikeNotification, 
-	sendPrayerRequestCommentNotification 
+const {
+	sendPrayerRequestCreatedNotification,
+	sendPrayerRequestLikeNotification,
+	sendPrayerRequestCommentNotification,
 } = require('../services/notificationService');
-
 
 // Prayer Request Controllers
 exports.createPrayerRequest = async (req, res) => {
@@ -27,41 +26,43 @@ exports.createPrayerRequest = async (req, res) => {
 		// Parse anonymous flag (default to false if not provided)
 		const isAnonymous = anonymous === 'true' || anonymous === true || false;
 
-	// Upload photos to Supabase Storage
-	let photoUrls = [];
-	const files = req.files;
-	
-	// Only process files if they exist and are in an array with items
-	if (files && Array.isArray(files) && files.length > 0) {
-		console.log(`Uploading ${files.length} files to Supabase...`);
-		for (const file of files) {
-			const filePath = `prayer-requests/${user.id}/${Date.now()}_${
-				file.originalname
-			}`;
-			console.log(`Uploading file to path: ${filePath}`);
-			console.log(`File size: ${file.size} bytes, mimetype: ${file.mimetype}`);
-			
-			const { data, error } = await supabase.storage
-				.from('prayer-media')
-				.upload(filePath, file.buffer, {
-					contentType: file.mimetype,
-					upsert: false,
-				});
-			
-			if (error) {
-				console.error('Supabase storage upload error:', error);
-				throw error;
+		// Upload photos to Supabase Storage
+		let photoUrls = [];
+		const files = req.files;
+
+		// Only process files if they exist and are in an array with items
+		if (files && Array.isArray(files) && files.length > 0) {
+			console.log(`Uploading ${files.length} files to Supabase...`);
+			for (const file of files) {
+				const filePath = `prayer-requests/${user.id}/${Date.now()}_${
+					file.originalname
+				}`;
+				console.log(`Uploading file to path: ${filePath}`);
+				console.log(
+					`File size: ${file.size} bytes, mimetype: ${file.mimetype}`
+				);
+
+				const { data, error } = await supabase.storage
+					.from('prayer-media')
+					.upload(filePath, file.buffer, {
+						contentType: file.mimetype,
+						upsert: false,
+					});
+
+				if (error) {
+					console.error('Supabase storage upload error:', error);
+					throw error;
+				}
+
+				console.log('Upload successful, data:', data);
+				const { data: urlData } = supabase.storage
+					.from('prayer-media')
+					.getPublicUrl(filePath);
+				const publicUrl = urlData.publicUrl;
+				console.log('Public URL:', publicUrl);
+				photoUrls.push(publicUrl);
 			}
-			
-			console.log('Upload successful, data:', data);
-			const { data: urlData } = supabase.storage
-				.from('prayer-media')
-				.getPublicUrl(filePath);
-			const publicUrl = urlData.publicUrl;
-			console.log('Public URL:', publicUrl);
-			photoUrls.push(publicUrl);
 		}
-	}
 
 		const title = req.body.title
 			? req.body.title.trim()
@@ -85,9 +86,12 @@ exports.createPrayerRequest = async (req, res) => {
 
 		if (error) throw error;
 
-		// Fire-and-forget push broadcast (do not block response)
-		sendPrayerRequestCreatedPush(data[0]).catch((e) => {
-			console.error('Push notification send failed:', e?.message || e);
+		// Fire-and-forget notification to poster's friends (do not block response)
+		sendPrayerRequestCreatedNotification(data[0], user).catch((e) => {
+			console.error(
+				'Prayer request creation notification failed:',
+				e?.message || e
+			);
 		});
 
 		// Populate owner info (handles anonymous case)
@@ -103,7 +107,7 @@ exports.createPrayerRequest = async (req, res) => {
 exports.getPrayerRequests = async (req, res) => {
 	try {
 		const user = req.user; // from optionalAuth middleware (may be undefined)
-		
+
 		const { data, error } = await supabase
 			.from('prayer_requests')
 			.select('*')
@@ -117,7 +121,7 @@ exports.getPrayerRequests = async (req, res) => {
 		// Get like counts and user's likes for all prayer requests
 		if (populatedRequests && populatedRequests.length > 0) {
 			const prayerRequestIds = populatedRequests.map((pr) => pr.id);
-			
+
 			// Get like counts grouped by prayer_request_id
 			const { data: likeCounts, error: likeError } = await supabase
 				.from('prayer_request_likes')
@@ -129,7 +133,8 @@ exports.getPrayerRequests = async (req, res) => {
 			// Count likes per prayer request
 			const likeCountMap = {};
 			likeCounts?.forEach((like) => {
-				likeCountMap[like.prayer_request_id] = (likeCountMap[like.prayer_request_id] || 0) + 1;
+				likeCountMap[like.prayer_request_id] =
+					(likeCountMap[like.prayer_request_id] || 0) + 1;
 			});
 
 			// Get user's likes if authenticated
@@ -262,16 +267,18 @@ exports.deletePrayerRequest = async (req, res) => {
 
 		// Delete associated media from prayer-media bucket
 		if (prayerRequest.photos && prayerRequest.photos.length > 0) {
-			const filePaths = prayerRequest.photos.map((url) => {
-				// Extract file path from public URL
-				// URL format: {SUPABASE_URL}/storage/v1/object/public/prayer-media/{path}
-				const bucketPath = '/storage/v1/object/public/prayer-media/';
-				const pathIndex = url.indexOf(bucketPath);
-				if (pathIndex !== -1) {
-					return url.substring(pathIndex + bucketPath.length);
-				}
-				return null;
-			}).filter(Boolean);
+			const filePaths = prayerRequest.photos
+				.map((url) => {
+					// Extract file path from public URL
+					// URL format: {SUPABASE_URL}/storage/v1/object/public/prayer-media/{path}
+					const bucketPath = '/storage/v1/object/public/prayer-media/';
+					const pathIndex = url.indexOf(bucketPath);
+					if (pathIndex !== -1) {
+						return url.substring(pathIndex + bucketPath.length);
+					}
+					return null;
+				})
+				.filter(Boolean);
 
 			if (filePaths.length > 0) {
 				const { error: storageError } = await supabase.storage
@@ -322,7 +329,7 @@ exports.addComment = async (req, res) => {
 		// Check if prayer request exists
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('id')
+			.select('id, owner_id, title, anonymous')
 			.eq('id', prayerRequestId)
 			.single();
 
@@ -349,9 +356,14 @@ exports.addComment = async (req, res) => {
 		const populatedComment = await populateUser(comment);
 
 		// Fire-and-forget notification to prayer request owner (do not block response)
-		sendPrayerRequestCommentNotification(prayerRequest, comment, user).catch((e) => {
-			console.error('Prayer request comment notification failed:', e?.message || e);
-		});
+		sendPrayerRequestCommentNotification(prayerRequest, comment, user).catch(
+			(e) => {
+				console.error(
+					'Prayer request comment notification failed:',
+					e?.message || e
+				);
+			}
+		);
 
 		res.status(201).json({ comment: populatedComment });
 	} catch (err) {
@@ -371,7 +383,7 @@ exports.getComments = async (req, res) => {
 		// Check if prayer request exists
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('id')
+			.select('id, owner_id, title, anonymous')
 			.eq('id', prayerRequestId)
 			.single();
 
@@ -527,7 +539,7 @@ exports.likePrayerRequest = async (req, res) => {
 		// Check if prayer request exists
 		const { data: prayerRequest, error: fetchError } = await supabase
 			.from('prayer_requests')
-			.select('id')
+			.select('id, owner_id, title, anonymous')
 			.eq('id', prayerRequestId)
 			.single();
 
@@ -544,7 +556,9 @@ exports.likePrayerRequest = async (req, res) => {
 			.single();
 
 		if (existingLike) {
-			return res.status(400).json({ error: 'You have already liked this prayer request' });
+			return res
+				.status(400)
+				.json({ error: 'You have already liked this prayer request' });
 		}
 
 		// Insert the like with only user_id
@@ -572,13 +586,16 @@ exports.likePrayerRequest = async (req, res) => {
 
 		// Fire-and-forget notification to prayer request owner (do not block response)
 		sendPrayerRequestLikeNotification(prayerRequest, like, user).catch((e) => {
-			console.error('Prayer request like notification failed:', e?.message || e);
+			console.error(
+				'Prayer request like notification failed:',
+				e?.message || e
+			);
 		});
 
-		res.status(201).json({ 
+		res.status(201).json({
 			message: 'Prayer request liked successfully',
 			like: populatedLike,
-			likeCount: count 
+			likeCount: count,
 		});
 	} catch (err) {
 		console.error(err);
@@ -621,9 +638,9 @@ exports.unlikePrayerRequest = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('prayer_request_id', prayerRequestId);
 
-		res.status(200).json({ 
+		res.status(200).json({
 			message: 'Prayer request unliked successfully',
-			likeCount: count 
+			likeCount: count,
 		});
 	} catch (err) {
 		console.error(err);
@@ -703,7 +720,9 @@ exports.likeComment = async (req, res) => {
 			.single();
 
 		if (existingLike) {
-			return res.status(400).json({ error: 'You have already liked this comment' });
+			return res
+				.status(400)
+				.json({ error: 'You have already liked this comment' });
 		}
 
 		// Insert the like with only user_id
@@ -729,10 +748,10 @@ exports.likeComment = async (req, res) => {
 		// Populate user info
 		const populatedLike = await populateUser(like);
 
-		res.status(201).json({ 
+		res.status(201).json({
 			message: 'Comment liked successfully',
 			like: populatedLike,
-			likeCount: count 
+			likeCount: count,
 		});
 	} catch (err) {
 		console.error(err);
@@ -775,9 +794,9 @@ exports.unlikeComment = async (req, res) => {
 			.select('*', { count: 'exact', head: true })
 			.eq('comment_id', commentId);
 
-		res.status(200).json({ 
+		res.status(200).json({
 			message: 'Comment unliked successfully',
-			likeCount: count 
+			likeCount: count,
 		});
 	} catch (err) {
 		console.error(err);
