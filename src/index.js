@@ -52,6 +52,19 @@ logger.token('localdate', () => {
 	return new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
 });
 
+logger.token('user', (req) => {
+	try {
+		//extract the user from the request
+		const candidate = req.user.full_name
+
+		if (candidate === undefined || candidate === null || candidate === '') return '-';
+
+		return candidate;
+	} catch (_) {
+		return '-';
+	}
+});
+
 //represents our whole API. Atleast the root of it
 const app = express();
 
@@ -60,7 +73,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(
 	logger(
-		'Method: :method\nURL: :url\nStatus: :status\nContent-Length: :res[content-length]\nTotal time: :total-time ms\nDate: :localdate (CT)\n\n'
+		'Method: :method\nUser: :user\nURL: :url\nStatus: :status\nContent-Length: :res[content-length]\nTotal time: :total-time ms\nDate: :localdate (CT)\n\n'
 	)
 );
 

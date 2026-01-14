@@ -1,28 +1,106 @@
 const supabase = require('../supabase');
 const { populateOwner, populateUser } = require('../utils/populateUserInfo');
+const { geocodeAddress } = require('../utils/geocode');
+const {
+	normalizeEventLocation,
+	hasAnyLocationField,
+} = require('../utils/locationPayload');
 const { 
 	sendEventCreatedNotification,
 	sendEventLikeNotification,
 	sendEventCommentNotification 
 } = require('../services/notificationService');
 
+function addLocationCompatibility(event) {
+	if (!event || typeof event !== 'object') return event;
+
+	const locationName = event.location_name ?? event.locationName ?? null;
+	const locationObj = {
+		name: locationName,
+		address: event.address ?? null,
+		city: event.city ?? null,
+		state: event.state ?? null,
+		latitude: event.latitude ?? null,
+		longitude: event.longitude ?? null,
+	};
+
+	// Backwards compatibility for older clients
+	event.location = locationObj;
+	// Friendly camelCase alias for newer clients
+	event.locationName = locationName;
+
+	return event;
+}
+
+function addLocationCompatibilityToMany(items) {
+	if (!items) return items;
+	if (Array.isArray(items)) {
+		items.forEach(addLocationCompatibility);
+		return items;
+	}
+	return addLocationCompatibility(items);
+}
+
 // Create a new event
 const createEvent = async (req, res) => {
-	const { title, description, location, date, tags } = req.body;
+	const { title, description, date, tags } = req.body;
+	const legacyLocation = req.body?.location;
+	let {
+		location_name,
+		address,
+		city,
+		state,
+		latitude,
+		longitude,
+	} = normalizeEventLocation(req.body);
 
 	// Validate required fields
-	if (!title || !description || !location || !date) {
+	if (!title || !description || !date || !hasAnyLocationField({ location_name, address, city, state, latitude, longitude })) {
 		return res
 			.status(422)
 			.send({ error: 'You must provide all required event details' });
 	}
 
 	try {
+		// Geocode (soft-fail): fill lat/lng and normalize address/city/state if possible.
+		// Prefer geocoding the street address; fall back to location name if needed.
+		const geocodeBaseAddress = address || location_name;
+		const shouldGeocode =
+			!!geocodeBaseAddress &&
+			(latitude === null ||
+				latitude === undefined ||
+				longitude === null ||
+				longitude === undefined ||
+				!address ||
+				!city ||
+				!state);
+
+		if (shouldGeocode) {
+			const geocodeResult = await geocodeAddress({
+				address: geocodeBaseAddress,
+				city,
+				state,
+			});
+
+			if (geocodeResult.ok) {
+				address = geocodeResult.data.address ?? address;
+				city = geocodeResult.data.city ?? city;
+				state = geocodeResult.data.state ?? state;
+				latitude = geocodeResult.data.latitude ?? latitude;
+				longitude = geocodeResult.data.longitude ?? longitude;
+			} else {
+				// Soft-fail per requirements; keep whatever the client provided.
+				console.warn('Geocoding failed (createEvent):', geocodeResult.error);
+			}
+		}
+
 		// Check for scheduling conflicts
+		const conflictField = address ? 'address' : 'location_name';
+		const conflictValue = address || location_name;
 		const { data: existingEvent, error: checkError } = await supabase
 			.from('events')
 			.select('*')
-			.eq('location', location)
+			.eq(conflictField, conflictValue)
 			.gte('date', new Date(new Date(date).setHours(0, 0, 0, 0)).toISOString())
 			.lt(
 				'date',
@@ -43,7 +121,25 @@ const createEvent = async (req, res) => {
 				{
 					title,
 					description,
-					location,
+					// Keep legacy location column populated for existing clients/DB constraints.
+					// If the client didn't send legacy location, synthesize it.
+					location:
+						legacyLocation ??
+						{
+							name: location_name,
+							address,
+							city,
+							state,
+							latitude,
+							longitude,
+						},
+					// New structured location fields
+					location_name,
+					address,
+					city,
+					state,
+					latitude,
+					longitude,
 					date: new Date(date).toISOString(),
 					owner_id: req.user.id,
 					tags: tags || [],
@@ -84,6 +180,7 @@ const createEvent = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(eventWithDetails);
+		addLocationCompatibility(populatedEvent);
 
 		// Fire-and-forget notification to followers (do not block response)
 		sendEventCreatedNotification(event, req.user).catch((e) => {
@@ -110,6 +207,7 @@ const getAllEvents = async (req, res) => {
 
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
+		addLocationCompatibilityToMany(populatedEvents);
 
 		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
@@ -170,6 +268,7 @@ const getMyEvents = async (req, res) => {
 
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
+		addLocationCompatibilityToMany(populatedEvents);
 
 		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
@@ -246,6 +345,7 @@ const getAttendingEvents = async (req, res) => {
 
 		// Populate owner info for all events
 		const populatedEvents = await populateOwner(events);
+		addLocationCompatibilityToMany(populatedEvents);
 
 		// Get like counts and user's likes for all events
 		if (populatedEvents && populatedEvents.length > 0) {
@@ -344,6 +444,7 @@ const getEventById = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(event);
+		addLocationCompatibility(populatedEvent);
 
 		res.send({
 			...populatedEvent,
@@ -359,7 +460,9 @@ const getEventById = async (req, res) => {
 
 // Update an event
 const updateEvent = async (req, res) => {
-	const { title, description, location, date } = req.body;
+	const { title, description, date } = req.body;
+	const legacyLocation = req.body?.location;
+	const incomingLocation = normalizeEventLocation(req.body);
 
 	try {
 		// First check if the event exists and the user is the owner
@@ -380,13 +483,79 @@ const updateEvent = async (req, res) => {
 				.send({ error: 'You can only update events you own' });
 		}
 
+		// Build next location state (prefer request values, otherwise keep existing)
+		let location_name =
+			incomingLocation.location_name ?? existingEvent.location_name ?? null;
+		let address = incomingLocation.address ?? existingEvent.address ?? null;
+		let city = incomingLocation.city ?? existingEvent.city ?? null;
+		let state = incomingLocation.state ?? existingEvent.state ?? null;
+		let latitude =
+			incomingLocation.latitude ?? existingEvent.latitude ?? null;
+		let longitude =
+			incomingLocation.longitude ?? existingEvent.longitude ?? null;
+
+		// Only geocode if the request is attempting to change location, and we have something to geocode.
+		const isLocationChanging =
+			hasAnyLocationField(incomingLocation) ||
+			legacyLocation !== undefined;
+
+		if (isLocationChanging) {
+			const geocodeBaseAddress = address || location_name;
+			const shouldGeocode =
+				!!geocodeBaseAddress &&
+				(latitude === null ||
+					latitude === undefined ||
+					longitude === null ||
+					longitude === undefined ||
+					!address ||
+					!city ||
+					!state);
+
+			if (shouldGeocode) {
+				const geocodeResult = await geocodeAddress({
+					address: geocodeBaseAddress,
+					city,
+					state,
+				});
+
+				if (geocodeResult.ok) {
+					address = geocodeResult.data.address ?? address;
+					city = geocodeResult.data.city ?? city;
+					state = geocodeResult.data.state ?? state;
+					latitude = geocodeResult.data.latitude ?? latitude;
+					longitude = geocodeResult.data.longitude ?? longitude;
+				} else {
+					console.warn('Geocoding failed (updateEvent):', geocodeResult.error);
+				}
+			}
+		}
+
 		// Update the event
 		const { data: event, error: updateError } = await supabase
 			.from('events')
 			.update({
 				title: title || existingEvent.title,
 				description: description || existingEvent.description,
-				location: location || existingEvent.location,
+				// Keep legacy location column for existing clients/DB constraints.
+				location:
+					legacyLocation ??
+					(isLocationChanging
+						? {
+								name: location_name,
+								address,
+								city,
+								state,
+								latitude,
+								longitude,
+						  }
+						: existingEvent.location),
+				// New structured location fields
+				location_name,
+				address,
+				city,
+				state,
+				latitude,
+				longitude,
 				date: date ? new Date(date).toISOString() : existingEvent.date,
 			})
 			.eq('id', req.params.id)
@@ -413,6 +582,7 @@ const updateEvent = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(eventWithDetails);
+		addLocationCompatibility(populatedEvent);
 
 		res.send(populatedEvent);
 	} catch (err) {
@@ -479,6 +649,7 @@ const attendEvent = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(eventWithDetails);
+		addLocationCompatibility(populatedEvent);
 
 		res.send(populatedEvent);
 	} catch (err) {
@@ -535,6 +706,7 @@ const cancelAttendance = async (req, res) => {
 
 		// Populate owner info
 		const populatedEvent = await populateOwner(eventWithDetails);
+		addLocationCompatibility(populatedEvent);
 
 		res.send(populatedEvent);
 	} catch (err) {
