@@ -46,6 +46,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 //middlewares to be used in the API
 const requireAuth = require('./middlewares/requireAuth');
 const errorHandler = require('./middlewares/errorHandler');
+// Clear cached user info each request so profile data stays fresh
+const { clearCache } = require('./utils/populateUserInfo');
 
 //define a custom date format for the logger
 logger.token('localdate', () => {
@@ -60,9 +62,15 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(
 	logger(
-		'Method: :method\nURL: :url\nStatus: :status\nContent-Length: :res[content-length]\nTotal time: :total-time ms\nDate: :localdate (CT)\n\n'
-	)
+		'Method: :method\nURL: :url\nStatus: :status\nContent-Length: :res[content-length]\nTotal time: :total-time ms\nDate: :localdate (CT)\n\n',
+	),
 );
+
+// Clear user info cache for every incoming request
+app.use((req, res, next) => {
+	clearCache();
+	next();
+});
 
 //all the routes for the API
 app.use('/API/v1/auth', authRoutes);
