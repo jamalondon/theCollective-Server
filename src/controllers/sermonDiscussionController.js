@@ -6,7 +6,7 @@ exports.createDiscussion = async (req, res) => {
 		const { data: discussion, error } = await supabase
 			.from('sermon_discussions')
 			.insert([
-								{
+				{
 					...req.body,
 					created_by: req.user.id,
 					sermon_series_id: req.body.sermonSeries,
@@ -22,7 +22,7 @@ exports.createDiscussion = async (req, res) => {
 				*,
 				created_by:users (name, username, email),
 				sermon_series:sermon_series (title)
-			`
+			`,
 			)
 			.single();
 
@@ -106,7 +106,7 @@ exports.getDiscussion = async (req, res) => {
 					created_at,
 					created_by:users (name, email)
 				)
-			`
+			`,
 			)
 			.eq('id', req.params.discussionId)
 			.single();
@@ -157,7 +157,7 @@ exports.updateDiscussion = async (req, res) => {
 
 		// Remove undefined values
 		Object.keys(updateData).forEach(
-			(key) => updateData[key] === undefined && delete updateData[key]
+			(key) => updateData[key] === undefined && delete updateData[key],
 		);
 
 		const { data: discussion, error } = await supabase
@@ -169,7 +169,7 @@ exports.updateDiscussion = async (req, res) => {
 				*,
 				created_by:users (name, username, email),
 				sermon_series:sermon_series (title)
-			`
+			`,
 			)
 			.single();
 
@@ -250,7 +250,7 @@ exports.addComment = async (req, res) => {
 				`
 				*,
 				created_by:users (name, email)
-			`
+			`,
 			)
 			.single();
 
@@ -294,7 +294,7 @@ exports.updateComment = async (req, res) => {
 				`
 				*,
 				created_by:users (name, email)
-			`
+			`,
 			)
 			.single();
 

@@ -2,125 +2,142 @@ const supabase = require('../supabase');
 const AppError = require('../utils/AppError');
 
 exports.createSermon = async (req, res) => {
-  try {
-    const payload = {
-      title: req.body.title,
-      sermon_series_id: req.body.sermonSeries || null,
-      speakers: req.body.speakers || [],
-      summary: req.body.summary || null,
-      key_points: req.body.keyPoints || [],
-      verses: req.body.verses || [],
-      created_by: req.user.id,
-    };
+	try {
+		const payload = {
+			title: req.body.title,
+			sermon_series_id: req.body.sermonSeries || null,
+			speakers: req.body.speakers || [],
+			summary: req.body.summary || null,
+			key_points: req.body.keyPoints || [],
+			verses: req.body.verses || [],
+			created_by: req.user.id,
+		};
 
-    const { data: sermon, error } = await supabase
-      .from('sermons')
-      .insert([payload])
-      .select()
-      .single();
+		const { data: sermon, error } = await supabase
+			.from('sermons')
+			.insert([payload])
+			.select()
+			.single();
 
-    if (error) throw error;
+		if (error) throw error;
 
-    res.status(201).json({ status: 'success', data: sermon });
-  } catch (err) {
-    res.status(err.statusCode || 400).json({ status: 'error', message: err.message });
-  }
+		res.status(201).json({ status: 'success', data: sermon });
+	} catch (err) {
+		res
+			.status(err.statusCode || 400)
+			.json({ status: 'error', message: err.message });
+	}
 };
 
 exports.getSermons = async (req, res) => {
-  try {
-    let query = supabase.from('sermons').select(`
+	try {
+		let query = supabase.from('sermons').select(`
       *,
       created_by:users (name, username, email)
     `);
 
-    if (req.query.sermonSeries) {
-      query = query.eq('sermon_series_id', req.query.sermonSeries);
-    }
+		if (req.query.sermonSeries) {
+			query = query.eq('sermon_series_id', req.query.sermonSeries);
+		}
 
-    if (req.query.title) {
-      query = query.ilike('title', `%${req.query.title}%`);
-    }
+		if (req.query.title) {
+			query = query.ilike('title', `%${req.query.title}%`);
+		}
 
-    const { data: sermons, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
+		const { data: sermons, error } = await query.order('created_at', {
+			ascending: false,
+		});
+		if (error) throw error;
 
-    res.json({ status: 'success', results: sermons.length, data: sermons });
-  } catch (err) {
-    res.status(500).json({ status: 'error', message: err.message });
-  }
+		res.json({ status: 'success', results: sermons.length, data: sermons });
+	} catch (err) {
+		res.status(500).json({ status: 'error', message: err.message });
+	}
 };
 
 exports.getSermon = async (req, res) => {
-  try {
-    const { data: sermon, error } = await supabase
-      .from('sermons')
-      .select(`*, created_by:users (name, username, email)`) 
-      .eq('id', req.params.sermonId)
-      .single();
+	try {
+		const { data: sermon, error } = await supabase
+			.from('sermons')
+			.select(`*, created_by:users (name, username, email)`)
+			.eq('id', req.params.sermonId)
+			.single();
 
-    if (error || !sermon) throw new AppError('Sermon not found', 404);
+		if (error || !sermon) throw new AppError('Sermon not found', 404);
 
-    res.json({ status: 'success', data: sermon });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
-  }
+		res.json({ status: 'success', data: sermon });
+	} catch (err) {
+		res
+			.status(err.statusCode || 500)
+			.json({ status: 'error', message: err.message });
+	}
 };
 
 exports.updateSermon = async (req, res) => {
-  try {
-    // Check ownership if needed
-    const { data: existing, error: checkError } = await supabase
-      .from('sermons')
-      .select('created_by')
-      .eq('id', req.params.sermonId)
-      .single();
+	try {
+		// Check ownership if needed
+		const { data: existing, error: checkError } = await supabase
+			.from('sermons')
+			.select('created_by')
+			.eq('id', req.params.sermonId)
+			.single();
 
-    if (checkError || !existing) throw new AppError('Sermon not found', 404);
-    if (existing.created_by !== req.user.id) throw new AppError('Not authorized', 403);
+		if (checkError || !existing) throw new AppError('Sermon not found', 404);
+		if (existing.created_by !== req.user.id)
+			throw new AppError('Not authorized', 403);
 
-    const updateData = {
-      title: req.body.title,
-      sermon_series_id: req.body.sermonSeries,
-      speakers: req.body.speakers,
-      summary: req.body.summary,
-      key_points: req.body.keyPoints,
-      verses: req.body.verses,
-    };
+		const updateData = {
+			title: req.body.title,
+			sermon_series_id: req.body.sermonSeries,
+			speakers: req.body.speakers,
+			summary: req.body.summary,
+			key_points: req.body.keyPoints,
+			verses: req.body.verses,
+		};
 
-    Object.keys(updateData).forEach((k) => updateData[k] === undefined && delete updateData[k]);
+		Object.keys(updateData).forEach(
+			(k) => updateData[k] === undefined && delete updateData[k],
+		);
 
-    const { data: sermon, error } = await supabase
-      .from('sermons')
-      .update(updateData)
-      .eq('id', req.params.sermonId)
-      .select()
-      .single();
+		const { data: sermon, error } = await supabase
+			.from('sermons')
+			.update(updateData)
+			.eq('id', req.params.sermonId)
+			.select()
+			.single();
 
-    if (error) throw error;
+		if (error) throw error;
 
-    res.json({ status: 'success', data: sermon });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
-  }
+		res.json({ status: 'success', data: sermon });
+	} catch (err) {
+		res
+			.status(err.statusCode || 500)
+			.json({ status: 'error', message: err.message });
+	}
 };
 
 exports.deleteSermon = async (req, res) => {
-  try {
-    const { data: existing, error: checkError } = await supabase
-      .from('sermons')
-      .select('created_by')
-      .eq('id', req.params.sermonId)
-      .single();
+	try {
+		const { data: existing, error: checkError } = await supabase
+			.from('sermons')
+			.select('created_by')
+			.eq('id', req.params.sermonId)
+			.single();
 
-    if (checkError || !existing) throw new AppError('Sermon not found', 404);
-    if (existing.created_by !== req.user.id) throw new AppError('Not authorized', 403);
+		if (checkError || !existing) throw new AppError('Sermon not found', 404);
+		if (existing.created_by !== req.user.id)
+			throw new AppError('Not authorized', 403);
 
-    const { error } = await supabase.from('sermons').delete().eq('id', req.params.sermonId);
-    if (error) throw error;
+		const { error } = await supabase
+			.from('sermons')
+			.delete()
+			.eq('id', req.params.sermonId);
+		if (error) throw error;
 
-    res.json({ status: 'success', data: null });
-  } catch (err) {
-    res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
-  }
+		res.json({ status: 'success', data: null });
+	} catch (err) {
+		res
+			.status(err.statusCode || 500)
+			.json({ status: 'error', message: err.message });
+	}
 };
