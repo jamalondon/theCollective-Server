@@ -6,10 +6,11 @@ exports.createDiscussion = async (req, res) => {
 		const { data: discussion, error } = await supabase
 			.from('sermon_discussions')
 			.insert([
-				{
+								{
 					...req.body,
 					created_by: req.user.id,
 					sermon_series_id: req.body.sermonSeries,
+					sermon_id: req.body.sermonId || null,
 					week_number: req.body.weekNumber,
 					discussion_date: new Date().toISOString(),
 					scripture_references: req.body.scriptureReferences || [],
@@ -45,6 +46,7 @@ exports.getDiscussions = async (req, res) => {
 				*,
 				created_by:users (name, username, email),
 				sermon_series:sermon_series (title),
+				sermon:sermons (id, title, speakers, summary),
 				comments:sermon_discussion_comments (
 					id,
 					content,
@@ -55,6 +57,10 @@ exports.getDiscussions = async (req, res) => {
 
 		if (req.query.sermonSeries) {
 			query = query.eq('sermon_series_id', req.query.sermonSeries);
+		}
+
+		if (req.query.sermonId) {
+			query = query.eq('sermon_id', req.query.sermonId);
 		}
 
 		if (req.query.weekNumber) {
@@ -93,6 +99,7 @@ exports.getDiscussion = async (req, res) => {
 				*,
 				created_by:users (name, username, email),
 				sermon_series:sermon_series (title),
+				sermon:sermons (id, title, speakers, summary),
 				comments:sermon_discussion_comments (
 					id,
 					content,
@@ -142,6 +149,7 @@ exports.updateDiscussion = async (req, res) => {
 		const updateData = {
 			...req.body,
 			sermon_series_id: req.body.sermonSeries,
+			sermon_id: req.body.sermonId,
 			week_number: req.body.weekNumber,
 			scripture_references: req.body.scriptureReferences,
 			discussion_questions: req.body.discussionQuestions,
