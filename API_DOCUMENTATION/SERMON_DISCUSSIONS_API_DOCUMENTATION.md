@@ -34,23 +34,21 @@ fetch('/API/v1/sermon-discussions', {
 	method: 'POST',
 	headers: {
 		'Content-Type': 'application/json',
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 	body: JSON.stringify({
 		title: 'How can we apply this message to our daily lives?',
-		description: 'Let\'s discuss practical ways to implement today\'s sermon in our everyday routines',
-			sermonId: 'sermon-id',
-			// optional: sermonSeries: 'series-id',
+		description:
+			"Let's discuss practical ways to implement today's sermon in our everyday routines",
+		sermonId: 'sermon-id',
+		// optional: sermonSeries: 'series-id',
 		weekNumber: 3,
-		scriptureReferences: [
-			'Matthew 5:14-16',
-			'James 2:14-26'
-		],
+		scriptureReferences: ['Matthew 5:14-16', 'James 2:14-26'],
 		discussionQuestions: [
 			'What does it mean to be a light in the world?',
-			'How can we show our faith through our actions?'
+			'How can we show our faith through our actions?',
 		],
-		status: 'active'
+		status: 'active',
 	}),
 });
 ```
@@ -101,10 +99,7 @@ curl -X POST \
 		"description": "Let's discuss practical ways to implement today's sermon in our everyday routines",
 		"sermon_series_id": "series-id",
 		"week_number": 3,
-		"scripture_references": [
-			"Matthew 5:14-16",
-			"James 2:14-26"
-		],
+		"scripture_references": ["Matthew 5:14-16", "James 2:14-26"],
 		"discussion_questions": [
 			"What does it mean to be a light in the world?",
 			"How can we show our faith through our actions?"
@@ -127,12 +122,13 @@ curl -X POST \
 			"title": "Week 3 — Faith in Action",
 			"speakers": [{ "name": "Guest Speaker" }],
 			"summary": "Short sermon summary"
-		}
-		,
+		},
 		"sermon": {
 			"id": "sermon-id",
 			"title": "Week 3 — Faith in Action",
-			"speakers": [{ "name": "Guest Speaker", "photo": "https://example.com/img.jpg" }],
+			"speakers": [
+				{ "name": "Guest Speaker", "photo": "https://example.com/img.jpg" }
+			],
 			"summary": "A short summary of the sermon"
 		}
 	}
@@ -151,12 +147,15 @@ Get all sermon discussions with optional filtering.
 
 ```javascript
 // Using fetch API with query parameters
-fetch('/API/v1/sermon-discussions?sermonSeries=series-id&weekNumber=3&status=active', {
-	method: 'GET',
-	headers: {
-		'Authorization': 'Bearer your-jwt-token',
+fetch(
+	'/API/v1/sermon-discussions?sermonSeries=series-id&weekNumber=3&status=active',
+	{
+		method: 'GET',
+		headers: {
+			Authorization: 'Bearer your-jwt-token',
+		},
 	},
-});
+);
 ```
 
 ### cURL Example
@@ -186,10 +185,7 @@ curl -X GET \
 			"description": "Let's discuss practical ways to implement today's sermon in our everyday routines",
 			"sermon_series_id": "series-id",
 			"week_number": 3,
-			"scripture_references": [
-				"Matthew 5:14-16",
-				"James 2:14-26"
-			],
+			"scripture_references": ["Matthew 5:14-16", "James 2:14-26"],
 			"discussion_questions": [
 				"What does it mean to be a light in the world?",
 				"How can we show our faith through our actions?"
@@ -244,7 +240,7 @@ Get a specific discussion by ID with all comments.
 fetch('/API/v1/sermon-discussions/discussion-id', {
 	method: 'GET',
 	headers: {
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 });
 ```
@@ -268,10 +264,7 @@ curl -X GET \
 		"description": "Let's discuss practical ways to implement today's sermon in our everyday routines",
 		"sermon_series_id": "series-id",
 		"week_number": 3,
-		"scripture_references": [
-			"Matthew 5:14-16",
-			"James 2:14-26"
-		],
+		"scripture_references": ["Matthew 5:14-16", "James 2:14-26"],
 		"discussion_questions": [
 			"What does it mean to be a light in the world?",
 			"How can we show our faith through our actions?"
@@ -335,7 +328,7 @@ fetch('/API/v1/sermon-discussions/discussion-id', {
 	method: 'PATCH',
 	headers: {
 		'Content-Type': 'application/json',
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 	body: JSON.stringify({
 		title: 'Updated Discussion Title',
@@ -344,8 +337,8 @@ fetch('/API/v1/sermon-discussions/discussion-id', {
 		discussionQuestions: [
 			'What does it mean to be a light in the world?',
 			'How can we show our faith through our actions?',
-			'What challenges do we face in living out our faith?'
-		]
+			'What challenges do we face in living out our faith?',
+		],
 	}),
 });
 ```
@@ -390,10 +383,7 @@ curl -X PATCH \
 		"description": "Updated description",
 		"sermon_series_id": "series-id",
 		"week_number": 3,
-		"scripture_references": [
-			"Matthew 5:14-16",
-			"James 2:14-26"
-		],
+		"scripture_references": ["Matthew 5:14-16", "James 2:14-26"],
 		"discussion_questions": [
 			"What does it mean to be a light in the world?",
 			"How can we show our faith through our actions?",
@@ -431,7 +421,7 @@ Delete a discussion (only the creator can delete).
 fetch('/API/v1/sermon-discussions/discussion-id', {
 	method: 'DELETE',
 	headers: {
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 });
 ```
@@ -469,10 +459,11 @@ fetch('/API/v1/sermon-discussions/discussion-id/comments', {
 	method: 'POST',
 	headers: {
 		'Content-Type': 'application/json',
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 	body: JSON.stringify({
-		content: 'This really spoke to my heart today. I think we can start by being more intentional in our daily interactions.'
+		content:
+			'This really spoke to my heart today. I think we can start by being more intentional in our daily interactions.',
 	}),
 });
 ```
@@ -530,10 +521,10 @@ fetch('/API/v1/sermon-discussions/discussion-id/comments/comment-id', {
 	method: 'PATCH',
 	headers: {
 		'Content-Type': 'application/json',
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 	body: JSON.stringify({
-		content: 'Updated comment content with more thoughts on the topic.'
+		content: 'Updated comment content with more thoughts on the topic.',
 	}),
 });
 ```
@@ -590,7 +581,7 @@ Delete a comment (only the creator can delete).
 fetch('/API/v1/sermon-discussions/discussion-id/comments/comment-id', {
 	method: 'DELETE',
 	headers: {
-		'Authorization': 'Bearer your-jwt-token',
+		Authorization: 'Bearer your-jwt-token',
 	},
 });
 ```
@@ -677,7 +668,7 @@ async function createDiscussion(discussionData) {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+				Authorization: `Bearer ${localStorage.getItem('token')}`,
 			},
 			body: JSON.stringify(discussionData),
 		});
@@ -699,17 +690,19 @@ async function createDiscussion(discussionData) {
 async function getAllDiscussions(filters = {}) {
 	try {
 		const queryParams = new URLSearchParams();
-		
-		if (filters.sermonSeries) queryParams.append('sermonSeries', filters.sermonSeries);
-		if (filters.weekNumber) queryParams.append('weekNumber', filters.weekNumber);
+
+		if (filters.sermonSeries)
+			queryParams.append('sermonSeries', filters.sermonSeries);
+		if (filters.weekNumber)
+			queryParams.append('weekNumber', filters.weekNumber);
 		if (filters.status) queryParams.append('status', filters.status);
 
 		const url = `/API/v1/sermon-discussions${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-		
+
 		const response = await fetch(url, {
 			method: 'GET',
 			headers: {
-				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+				Authorization: `Bearer ${localStorage.getItem('token')}`,
 			},
 		});
 
@@ -729,14 +722,17 @@ async function getAllDiscussions(filters = {}) {
 // Add a comment to a discussion
 async function addComment(discussionId, content) {
 	try {
-		const response = await fetch(`/API/v1/sermon-discussions/${discussionId}/comments`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+		const response = await fetch(
+			`/API/v1/sermon-discussions/${discussionId}/comments`,
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${localStorage.getItem('token')}`,
+				},
+				body: JSON.stringify({ content }),
 			},
-			body: JSON.stringify({ content }),
-		});
+		);
 
 		if (!response.ok) {
 			throw new Error(`HTTP error! status: ${response.status}`);
@@ -754,14 +750,17 @@ async function addComment(discussionId, content) {
 // Update a comment
 async function updateComment(discussionId, commentId, content) {
 	try {
-		const response = await fetch(`/API/v1/sermon-discussions/${discussionId}/comments/${commentId}`, {
-			method: 'PATCH',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+		const response = await fetch(
+			`/API/v1/sermon-discussions/${discussionId}/comments/${commentId}`,
+			{
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${localStorage.getItem('token')}`,
+				},
+				body: JSON.stringify({ content }),
 			},
-			body: JSON.stringify({ content }),
-		});
+		);
 
 		if (!response.ok) {
 			throw new Error(`HTTP error! status: ${response.status}`);
@@ -779,12 +778,15 @@ async function updateComment(discussionId, commentId, content) {
 // Delete a comment
 async function deleteComment(discussionId, commentId) {
 	try {
-		const response = await fetch(`/API/v1/sermon-discussions/${discussionId}/comments/${commentId}`, {
-			method: 'DELETE',
-			headers: {
-				'Authorization': `Bearer ${localStorage.getItem('token')}`,
+		const response = await fetch(
+			`/API/v1/sermon-discussions/${discussionId}/comments/${commentId}`,
+			{
+				method: 'DELETE',
+				headers: {
+					Authorization: `Bearer ${localStorage.getItem('token')}`,
+				},
 			},
-		});
+		);
 
 		if (!response.ok) {
 			throw new Error(`HTTP error! status: ${response.status}`);
@@ -802,30 +804,28 @@ async function deleteComment(discussionId, commentId) {
 // Example usage
 const newDiscussion = {
 	title: 'How can we apply this message to our daily lives?',
-	description: 'Let\'s discuss practical ways to implement today\'s sermon in our everyday routines',
+	description:
+		"Let's discuss practical ways to implement today's sermon in our everyday routines",
 	sermonSeries: 'series-id',
 	weekNumber: 3,
-	scriptureReferences: [
-		'Matthew 5:14-16',
-		'James 2:14-26'
-	],
+	scriptureReferences: ['Matthew 5:14-16', 'James 2:14-26'],
 	discussionQuestions: [
 		'What does it mean to be a light in the world?',
-		'How can we show our faith through our actions?'
+		'How can we show our faith through our actions?',
 	],
-	status: 'active'
+	status: 'active',
 };
 
 createDiscussion(newDiscussion)
-	.then(result => {
+	.then((result) => {
 		console.log('Discussion created successfully:', result);
 		// Add a comment to the discussion
 		return addComment(result.data.id, 'This really spoke to my heart today!');
 	})
-	.then(comment => {
+	.then((comment) => {
 		console.log('Comment added:', comment);
 	})
-	.catch(error => {
+	.catch((error) => {
 		console.error('Error:', error);
 	});
 ```

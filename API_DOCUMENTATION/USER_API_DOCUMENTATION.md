@@ -115,8 +115,8 @@ Get comprehensive user profile with activity summary. If a `userId` parameter is
 
 ### URL Parameters
 
-| Parameter | Type   | Required | Description                                                                 |
-| --------- | ------ | -------- | --------------------------------------------------------------------------- |
+| Parameter | Type   | Required | Description                                                                     |
+| --------- | ------ | -------- | ------------------------------------------------------------------------------- |
 | `userId`  | string | No       | The ID of the user to look up. If not provided, defaults to authenticated user. |
 
 ### Request (Own Profile)
@@ -563,9 +563,7 @@ All routes may return these error responses:
 // Get own profile or a specific user's profile
 async function getUserProfile(userId = null) {
 	try {
-		const url = userId
-			? `/api/users/profile/${userId}`
-			: '/api/users/profile';
+		const url = userId ? `/api/users/profile/${userId}` : '/api/users/profile';
 
 		const response = await fetch(url, {
 			method: 'GET',

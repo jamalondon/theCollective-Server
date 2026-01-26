@@ -28,19 +28,22 @@ Create a new sermon record. `speakers`, `keyPoints` and `verses` are arrays. `sp
 
 ```javascript
 fetch('/API/v1/sermons', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer your-jwt-token',
-  },
-  body: JSON.stringify({
-    title: 'Week 3 — Faith in Action',
-    sermonSeries: 'series-id',        // optional
-    speakers: [{ "user_id": "user-uuid" }, { "name": "Guest", "photo": "https://..." }],
-    summary: 'Short summary of sermon',
-    keyPoints: ['Point A', 'Point B'],
-    verses: ['John 3:16', 'Romans 8:28']
-  }),
+	method: 'POST',
+	headers: {
+		'Content-Type': 'application/json',
+		Authorization: 'Bearer your-jwt-token',
+	},
+	body: JSON.stringify({
+		title: 'Week 3 — Faith in Action',
+		sermonSeries: 'series-id', // optional
+		speakers: [
+			{ user_id: 'user-uuid' },
+			{ name: 'Guest', photo: 'https://...' },
+		],
+		summary: 'Short summary of sermon',
+		keyPoints: ['Point A', 'Point B'],
+		verses: ['John 3:16', 'Romans 8:28'],
+	}),
 });
 ```
 
@@ -74,17 +77,17 @@ curl -X POST \
 
 ```json
 {
-  "status": "success",
-  "data": {
-    "id": "sermon-id",
-    "title": "Week 3 — Faith in Action",
-    "sermon_series_id": "series-id",
-    "speakers": [{ "name": "Guest" }],
-    "summary": "Short summary",
-    "key_points": ["A","B"],
-    "verses": ["John 3:16"],
-    "created_at": "2026-01-25T00:00:00.000Z"
-  }
+	"status": "success",
+	"data": {
+		"id": "sermon-id",
+		"title": "Week 3 — Faith in Action",
+		"sermon_series_id": "series-id",
+		"speakers": [{ "name": "Guest" }],
+		"summary": "Short summary",
+		"key_points": ["A", "B"],
+		"verses": ["John 3:16"],
+		"created_at": "2026-01-25T00:00:00.000Z"
+	}
 }
 ```
 

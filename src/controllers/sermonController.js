@@ -1,8 +1,14 @@
 const supabase = require('../supabase');
 const AppError = require('../utils/AppError');
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 exports.createSermon = async (req, res) => {
 	try {
+		// validate optional sermonSeries UUID to avoid DB errors
+		if (req.body.sermonSeries && !uuidRegex.test(req.body.sermonSeries)) {
+			throw new AppError('Invalid sermonSeries id format', 400);
+		}
+
 		const payload = {
 			title: req.body.title,
 			sermon_series_id: req.body.sermonSeries || null,
@@ -82,6 +88,11 @@ exports.updateSermon = async (req, res) => {
 			.single();
 
 		if (checkError || !existing) throw new AppError('Sermon not found', 404);
+
+		// validate optional sermonSeries UUID to avoid DB errors
+		if (req.body.sermonSeries && !uuidRegex.test(req.body.sermonSeries)) {
+			throw new AppError('Invalid sermonSeries id format', 400);
+		}
 
 		const updateData = {
 			title: req.body.title,
