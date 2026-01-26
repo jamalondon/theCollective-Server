@@ -10,7 +10,6 @@ exports.createSermon = async (req, res) => {
 			summary: req.body.summary || null,
 			key_points: req.body.keyPoints || [],
 			verses: req.body.verses || [],
-			created_by: req.user.id,
 		};
 
 		const { data: sermon, error } = await supabase
@@ -32,9 +31,9 @@ exports.createSermon = async (req, res) => {
 exports.getSermons = async (req, res) => {
 	try {
 		let query = supabase.from('sermons').select(`
-      *,
-      created_by:users (name, username, email)
-    `);
+	      *,
+	      sermon_series:sermon_series (id, title)
+	    `);
 
 		if (req.query.sermonSeries) {
 			query = query.eq('sermon_series_id', req.query.sermonSeries);
@@ -59,7 +58,7 @@ exports.getSermon = async (req, res) => {
 	try {
 		const { data: sermon, error } = await supabase
 			.from('sermons')
-			.select(`*, created_by:users (name, username, email)`)
+			.select(`*, sermon_series:sermon_series (id, title)`)
 			.eq('id', req.params.sermonId)
 			.single();
 
@@ -75,16 +74,14 @@ exports.getSermon = async (req, res) => {
 
 exports.updateSermon = async (req, res) => {
 	try {
-		// Check ownership if needed
+		// Ensure sermon exists
 		const { data: existing, error: checkError } = await supabase
 			.from('sermons')
-			.select('created_by')
+			.select('id')
 			.eq('id', req.params.sermonId)
 			.single();
 
 		if (checkError || !existing) throw new AppError('Sermon not found', 404);
-		if (existing.created_by !== req.user.id)
-			throw new AppError('Not authorized', 403);
 
 		const updateData = {
 			title: req.body.title,
@@ -120,13 +117,11 @@ exports.deleteSermon = async (req, res) => {
 	try {
 		const { data: existing, error: checkError } = await supabase
 			.from('sermons')
-			.select('created_by')
+			.select('id')
 			.eq('id', req.params.sermonId)
 			.single();
 
 		if (checkError || !existing) throw new AppError('Sermon not found', 404);
-		if (existing.created_by !== req.user.id)
-			throw new AppError('Not authorized', 403);
 
 		const { error } = await supabase
 			.from('sermons')

@@ -435,6 +435,12 @@ curl -X GET \
 					"title": "Faith in Action",
 					"description": "A series about living out our faith",
 					"series_image": "https://example.com/series-image.jpg"
+				},
+				"sermon": {
+					"id": "sermon-id",
+					"title": "Week 3 — Faith in Action",
+					"speakers": [{ "name": "Guest Speaker" }],
+					"summary": "Short sermon summary"
 				}
 			}
 		}

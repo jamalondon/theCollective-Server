@@ -16,6 +16,8 @@ All routes require authentication. Include the JWT token in the Authorization he
 Authorization: Bearer <your-jwt-token>
 ```
 
+> Note: Discussions now accept either `sermonId` (preferred) referencing a `sermons` record or the legacy `sermonSeries` id. When available responses include a nested `sermon` object with basic sermon metadata.
+
 ---
 
 ## 1. Create Discussion
@@ -37,7 +39,8 @@ fetch('/API/v1/sermon-discussions', {
 	body: JSON.stringify({
 		title: 'How can we apply this message to our daily lives?',
 		description: 'Let\'s discuss practical ways to implement today\'s sermon in our everyday routines',
-		sermonSeries: 'series-id',
+			sermonId: 'sermon-id',
+			// optional: sermonSeries: 'series-id',
 		weekNumber: 3,
 		scriptureReferences: [
 			'Matthew 5:14-16',
@@ -62,7 +65,8 @@ curl -X POST \
   -d '{
     "title": "How can we apply this message to our daily lives?",
     "description": "Let'\''s discuss practical ways to implement today'\''s sermon in our everyday routines",
-    "sermonSeries": "series-id",
+	"sermonId": "sermon-id",
+	// "sermonSeries": "series-id",
     "weekNumber": 3,
     "scriptureReferences": [
       "Matthew 5:14-16",
@@ -117,6 +121,19 @@ curl -X POST \
 		},
 		"sermon_series": {
 			"title": "Faith in Action"
+		},
+		"sermon": {
+			"id": "sermon-id",
+			"title": "Week 3 — Faith in Action",
+			"speakers": [{ "name": "Guest Speaker" }],
+			"summary": "Short sermon summary"
+		}
+		,
+		"sermon": {
+			"id": "sermon-id",
+			"title": "Week 3 — Faith in Action",
+			"speakers": [{ "name": "Guest Speaker", "photo": "https://example.com/img.jpg" }],
+			"summary": "A short summary of the sermon"
 		}
 	}
 }
@@ -189,6 +206,12 @@ curl -X GET \
 			},
 			"sermon_series": {
 				"title": "Faith in Action"
+			},
+			"sermon": {
+				"id": "sermon-id",
+				"title": "Week 3 — Faith in Action",
+				"speakers": [{ "name": "Guest Speaker" }],
+				"summary": "Short sermon summary"
 			},
 			"comments": [
 				{
@@ -265,6 +288,12 @@ curl -X GET \
 		},
 		"sermon_series": {
 			"title": "Faith in Action"
+		},
+		"sermon": {
+			"id": "sermon-id",
+			"title": "Week 3 — Faith in Action",
+			"speakers": [{ "name": "Guest Speaker" }],
+			"summary": "Short sermon summary"
 		},
 		"comments": [
 			{
