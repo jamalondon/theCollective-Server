@@ -55,20 +55,21 @@ const validateSermonSeriesCreate = [
 			}
 			return true;
 		}),
-		// coverImage is optional and can be null; if provided validate shape
-		body('coverImage')
-			.optional({ nullable: true })
-			.custom((value) => {
-				if (!value) return true;
-				if (typeof value !== 'object') throw new Error('coverImage must be an object');
-				if (!value.url || typeof value.url !== 'string') {
-					throw new Error('coverImage.url is required');
-				}
-				if (!value.publicId || typeof value.publicId !== 'string') {
-					throw new Error('coverImage.publicId is required');
-				}
-				return true;
-			}),
+	// coverImage is optional and can be null; if provided validate shape
+	body('coverImage')
+		.optional({ nullable: true })
+		.custom((value) => {
+			if (!value) return true;
+			if (typeof value !== 'object')
+				throw new Error('coverImage must be an object');
+			if (!value.url || typeof value.url !== 'string') {
+				throw new Error('coverImage.url is required');
+			}
+			if (!value.publicId || typeof value.publicId !== 'string') {
+				throw new Error('coverImage.publicId is required');
+			}
+			return true;
+		}),
 	handleValidationErrors,
 ];
 
@@ -121,20 +122,21 @@ const validateSermonSeriesUpdate = [
 			}
 			return true;
 		}),
-		// coverImage optional on update as well
-		body('coverImage')
-			.optional({ nullable: true })
-			.custom((value) => {
-				if (!value) return true;
-				if (typeof value !== 'object') throw new Error('coverImage must be an object');
-				if (!value.url || typeof value.url !== 'string') {
-					throw new Error('coverImage.url is required');
-				}
-				if (!value.publicId || typeof value.publicId !== 'string') {
-					throw new Error('coverImage.publicId is required');
-				}
-				return true;
-			}),
+	// coverImage optional on update as well
+	body('coverImage')
+		.optional({ nullable: true })
+		.custom((value) => {
+			if (!value) return true;
+			if (typeof value !== 'object')
+				throw new Error('coverImage must be an object');
+			if (!value.url || typeof value.url !== 'string') {
+				throw new Error('coverImage.url is required');
+			}
+			if (!value.publicId || typeof value.publicId !== 'string') {
+				throw new Error('coverImage.publicId is required');
+			}
+			return true;
+		}),
 	handleValidationErrors,
 ];
 
@@ -143,7 +145,8 @@ const validateSeriesId = [
 		.notEmpty()
 		.withMessage('Series ID is required')
 		.custom((value) => {
-			const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+			const uuidRegex =
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 			if (!uuidRegex.test(value)) {
 				throw new Error('Invalid series ID format');
 			}

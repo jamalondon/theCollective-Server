@@ -15,7 +15,10 @@ exports.createSeries = async (req, res) => {
 		if (req.body.endDate) {
 			payload.end_date = new Date(req.body.endDate).toISOString();
 		}
-		if (req.body.numberOfWeeks !== undefined && req.body.numberOfWeeks !== null) {
+		if (
+			req.body.numberOfWeeks !== undefined &&
+			req.body.numberOfWeeks !== null
+		) {
 			payload.number_of_weeks = req.body.numberOfWeeks;
 		}
 		if (req.body.coverImage) {
@@ -55,7 +58,7 @@ exports.getAllSeries = async (req, res) => {
 		// Add search functionality
 		if (req.query.search) {
 			query = query.or(
-				`title.ilike.%${req.query.search}%,description.ilike.%${req.query.search}%`
+				`title.ilike.%${req.query.search}%,description.ilike.%${req.query.search}%`,
 			);
 		}
 
@@ -63,7 +66,7 @@ exports.getAllSeries = async (req, res) => {
 		if (req.query.startDate) {
 			query = query.gte(
 				'start_date',
-				new Date(req.query.startDate).toISOString()
+				new Date(req.query.startDate).toISOString(),
 			);
 		}
 		if (req.query.endDate) {
@@ -103,7 +106,7 @@ exports.getSeries = async (req, res) => {
 				`
 				*,
 				created_by:users (name, username, email)
-			`
+			`,
 			)
 			.eq('id', req.params.seriesId)
 			.single();
@@ -156,13 +159,13 @@ exports.updateSeries = async (req, res) => {
 				? {
 						url: req.body.coverImage.url,
 						public_id: req.body.coverImage.publicId,
-				  }
+					}
 				: undefined,
 		};
 
 		// Remove undefined values
 		Object.keys(updateData).forEach(
-			(key) => updateData[key] === undefined && delete updateData[key]
+			(key) => updateData[key] === undefined && delete updateData[key],
 		);
 
 		const { data: series, error } = await supabase
