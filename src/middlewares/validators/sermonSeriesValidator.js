@@ -15,32 +15,26 @@ const validateSermonSeriesCreate = [
 		.isLength({ min: 10, max: 1000 })
 		.withMessage('Description must be between 10 and 1000 characters'),
 	body('numberOfWeeks')
-		.notEmpty()
-		.withMessage('Number of weeks is required')
+		.optional({ nullable: true })
 		.isInt({ min: 1, max: 52 })
 		.withMessage('Number of weeks must be between 1 and 52'),
 	body('startDate')
 		.notEmpty()
 		.withMessage('Start date is required')
 		.isISO8601()
-		.withMessage('Invalid start date format')
-		.custom((value, { req }) => {
-			const startDate = new Date(value);
-			if (startDate < new Date()) {
-				throw new Error('Start date cannot be in the past');
-			}
-			return true;
-		}),
+		.withMessage('Invalid start date format'),
 	body('endDate')
-		.optional()
+		.optional({ nullable: true })
 		.isISO8601()
 		.withMessage('Invalid end date format')
 		.custom((value, { req }) => {
 			if (!value) return true;
 			const endDate = new Date(value);
-			const startDate = new Date(req.body.startDate);
-			if (endDate <= startDate) {
-				throw new Error('End date must be after start date');
+			if (req.body.startDate) {
+				const startDate = new Date(req.body.startDate);
+				if (endDate <= startDate) {
+					throw new Error('End date must be after start date');
+				}
 			}
 			return true;
 		}),
@@ -61,6 +55,20 @@ const validateSermonSeriesCreate = [
 			}
 			return true;
 		}),
+		// coverImage is optional and can be null; if provided validate shape
+		body('coverImage')
+			.optional({ nullable: true })
+			.custom((value) => {
+				if (!value) return true;
+				if (typeof value !== 'object') throw new Error('coverImage must be an object');
+				if (!value.url || typeof value.url !== 'string') {
+					throw new Error('coverImage.url is required');
+				}
+				if (!value.publicId || typeof value.publicId !== 'string') {
+					throw new Error('coverImage.publicId is required');
+				}
+				return true;
+			}),
 	handleValidationErrors,
 ];
 
@@ -76,7 +84,7 @@ const validateSermonSeriesUpdate = [
 		.isLength({ min: 10, max: 1000 })
 		.withMessage('Description must be between 10 and 1000 characters'),
 	body('numberOfWeeks')
-		.optional()
+		.optional({ nullable: true })
 		.isInt({ min: 1, max: 52 })
 		.withMessage('Number of weeks must be between 1 and 52'),
 	body('startDate')
@@ -84,7 +92,7 @@ const validateSermonSeriesUpdate = [
 		.isISO8601()
 		.withMessage('Start date must be a valid date'),
 	body('endDate')
-		.optional()
+		.optional({ nullable: true })
 		.isISO8601()
 		.withMessage('End date must be a valid date')
 		.custom((endDate, { req }) => {
@@ -113,6 +121,20 @@ const validateSermonSeriesUpdate = [
 			}
 			return true;
 		}),
+		// coverImage optional on update as well
+		body('coverImage')
+			.optional({ nullable: true })
+			.custom((value) => {
+				if (!value) return true;
+				if (typeof value !== 'object') throw new Error('coverImage must be an object');
+				if (!value.url || typeof value.url !== 'string') {
+					throw new Error('coverImage.url is required');
+				}
+				if (!value.publicId || typeof value.publicId !== 'string') {
+					throw new Error('coverImage.publicId is required');
+				}
+				return true;
+			}),
 	handleValidationErrors,
 ];
 

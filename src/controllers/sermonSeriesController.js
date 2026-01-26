@@ -3,21 +3,31 @@ const AppError = require('../utils/AppError');
 
 exports.createSeries = async (req, res) => {
 	try {
+		const payload = {
+			title: req.body.title,
+			description: req.body.description,
+			created_by: req.user.id,
+		};
+
+		if (req.body.startDate) {
+			payload.start_date = new Date(req.body.startDate).toISOString();
+		}
+		if (req.body.endDate) {
+			payload.end_date = new Date(req.body.endDate).toISOString();
+		}
+		if (req.body.numberOfWeeks !== undefined && req.body.numberOfWeeks !== null) {
+			payload.number_of_weeks = req.body.numberOfWeeks;
+		}
+		if (req.body.coverImage) {
+			payload.cover_image = {
+				url: req.body.coverImage.url,
+				public_id: req.body.coverImage.publicId,
+			};
+		}
+
 		const { data: series, error } = await supabase
 			.from('sermon_series')
-			.insert([
-				{
-					...req.body,
-					created_by: req.user.id,
-					start_date: new Date(req.body.startDate).toISOString(),
-					end_date: new Date(req.body.endDate).toISOString(),
-					number_of_weeks: req.body.numberOfWeeks,
-					cover_image: {
-						url: req.body.coverImage.url,
-						public_id: req.body.coverImage.publicId,
-					},
-				},
-			])
+			.insert([payload])
 			.select()
 			.single();
 
