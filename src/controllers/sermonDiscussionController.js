@@ -1,27 +1,53 @@
 const supabase = require('../supabase');
 const AppError = require('../utils/AppError');
 
+const DISCUSSION_STATUSES = new Set(['active', 'completed', 'archived']);
+const normalizeStatus = (value) => {
+	if (value === undefined || value === null) return undefined;
+	const normalized = String(value).toLowerCase().trim();
+	return normalized || undefined;
+};
+
 exports.createDiscussion = async (req, res) => {
+	console.log('Creating sermon discussion with body:', req.body);
 	try {
+		const normalizedStatus = normalizeStatus(req.body.status) || 'active';
+		if (
+			normalizedStatus &&
+			!DISCUSSION_STATUSES.has(normalizedStatus)
+		) {
+			throw new AppError(
+				`Invalid status. Allowed: ${Array.from(DISCUSSION_STATUSES).join(', ')}`,
+				400,
+			);
+		}
+
+		const payload = {
+			title: req.body.title || null,
+			description: req.body.description || null,
+			status: normalizedStatus,
+			created_by: req.user.id,
+			sermon_series_id: req.body.sermonSeries,
+			sermon_id: req.body.sermonId || null,
+			week_number: req.body.weekNumber,
+			discussion_date: new Date().toISOString(),
+			scripture_references: req.body.scriptureReferences || [],
+			discussion_questions: req.body.discussionQuestions || [],
+			additional_resources: req.body.additionalResources || null,
+		};
+
+		Object.keys(payload).forEach(
+			(key) => payload[key] === undefined && delete payload[key],
+		);
+
 		const { data: discussion, error } = await supabase
 			.from('sermon_discussions')
-			.insert([
-				{
-					...req.body,
-					created_by: req.user.id,
-					sermon_series_id: req.body.sermonSeries,
-					sermon_id: req.body.sermonId || null,
-					week_number: req.body.weekNumber,
-					discussion_date: new Date().toISOString(),
-					scripture_references: req.body.scriptureReferences || [],
-					discussion_questions: req.body.discussionQuestions || [],
-				},
-			])
+			.insert([payload])
 			.select(
 				`
 				*,
-				created_by:users (name, username, email),
-				sermon_series:sermon_series (title)
+				created_by:users!sermon_discussions_created_by_fkey (full_name, username, email),
+				sermon_series:sermon_series!sermon_discussions_sermon_series_id_fkey (title)
 			`,
 			)
 			.single();
@@ -44,14 +70,14 @@ exports.getDiscussions = async (req, res) => {
 	try {
 		let query = supabase.from('sermon_discussions').select(`
 				*,
-				created_by:users (name, username, email),
-				sermon_series:sermon_series (title),
-				sermon:sermons (id, title, speakers, summary),
+				created_by:users!sermon_discussions_created_by_fkey (full_name, username, email),
+				sermon_series:sermon_series!sermon_discussions_sermon_series_id_fkey (title),
+				sermon:sermons!sermon_discussions_sermon_id_fkey (id, title, speakers, summary),
 				comments:sermon_discussion_comments (
 					id,
 					content,
 					created_at,
-					created_by:users (name, email)
+					created_by:users!sermon_discussion_comments_created_by_fkey (full_name, email)
 				)
 			`);
 
@@ -97,14 +123,14 @@ exports.getDiscussion = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, username, email),
-				sermon_series:sermon_series (title),
-				sermon:sermons (id, title, speakers, summary),
+				created_by:users!sermon_discussions_created_by_fkey (full_name, username, email),
+				sermon_series:sermon_series!sermon_discussions_sermon_series_id_fkey (title),
+				sermon:sermons!sermon_discussions_sermon_id_fkey (id, title, speakers, summary),
 				comments:sermon_discussion_comments (
 					id,
 					content,
 					created_at,
-					created_by:users (name, email)
+					created_by:users!sermon_discussion_comments_created_by_fkey (full_name, email)
 				)
 			`,
 			)
@@ -146,13 +172,27 @@ exports.updateDiscussion = async (req, res) => {
 		}
 
 		// Prepare update data
+		const normalizedStatus = normalizeStatus(req.body.status);
+		if (
+			normalizedStatus &&
+			!DISCUSSION_STATUSES.has(normalizedStatus)
+		) {
+			throw new AppError(
+				`Invalid status. Allowed: ${Array.from(DISCUSSION_STATUSES).join(', ')}`,
+				400,
+			);
+		}
+
 		const updateData = {
-			...req.body,
+			title: req.body.title,
+			description: req.body.description,
+			status: normalizedStatus,
 			sermon_series_id: req.body.sermonSeries,
 			sermon_id: req.body.sermonId,
 			week_number: req.body.weekNumber,
 			scripture_references: req.body.scriptureReferences,
 			discussion_questions: req.body.discussionQuestions,
+			additional_resources: req.body.additionalResources,
 		};
 
 		// Remove undefined values
@@ -167,8 +207,8 @@ exports.updateDiscussion = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, username, email),
-				sermon_series:sermon_series (title)
+				created_by:users!sermon_discussions_created_by_fkey (full_name, username, email),
+				sermon_series:sermon_series!sermon_discussions_sermon_series_id_fkey (title)
 			`,
 			)
 			.single();
@@ -249,7 +289,7 @@ exports.addComment = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email)
+				created_by:users!sermon_discussion_comments_created_by_fkey (full_name, email)
 			`,
 			)
 			.single();
@@ -293,7 +333,7 @@ exports.updateComment = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, email)
+				created_by:users!sermon_discussion_comments_created_by_fkey (full_name, email)
 			`,
 			)
 			.single();

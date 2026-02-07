@@ -52,11 +52,20 @@ exports.getSermons = async (req, res) => {
 		let query = supabase.from('sermons').select(`
 		  *,
 		  sermon_series:sermon_series (id, title),
-		  created_by:users (id, name, username, email)
+		  created_by:users (id, full_name, username, email)
 		`);
 
-		if (req.query.sermonSeries) {
-			query = query.eq('sermon_series_id', req.query.sermonSeries);
+		const sermonSeriesFilter =
+			req.query.sermonSeries ||
+			req.query.sermonSeriesId ||
+			req.query['series-id'] ||
+			req.query.seriesId;
+
+		if (sermonSeriesFilter) {
+			if (!uuidRegex.test(sermonSeriesFilter)) {
+				return res.json({ status: 'success', results: 0, data: [] });
+			}
+			query = query.eq('sermon_series_id', sermonSeriesFilter);
 		}
 
 		if (req.query.title) {
@@ -78,7 +87,7 @@ exports.getSermon = async (req, res) => {
 	try {
 		const { data: sermon, error } = await supabase
 			.from('sermons')
-			.select(`*, sermon_series:sermon_series (id, title), created_by:users (id, name, username, email)`)
+			.select(`*, sermon_series:sermon_series (id, title), created_by:users (id, full_name, username, email)`)
 			.eq('id', req.params.sermonId)
 			.single();
 
@@ -94,32 +103,33 @@ exports.getSermon = async (req, res) => {
 
 exports.updateSermon = async (req, res) => {
 	try {
-			// validate optional sermonSeries UUID to avoid DB errors
-			if (req.body.sermonSeries && !uuidRegex.test(req.body.sermonSeries)) {
-				throw new AppError('Invalid sermonSeries id format', 400);
-			}
+		// validate optional sermonSeries UUID to avoid DB errors
+		if (req.body.sermonSeries && !uuidRegex.test(req.body.sermonSeries)) {
+			throw new AppError('Invalid sermonSeries id format', 400);
+		}
 
-			// check user role and ownership: developers can update any sermon; leaders only their own
-			const { data: userRow, error: userErr } = await supabase
-				.from('users')
-				.select('role')
-				.eq('id', req.user.id)
-				.single();
-			if (userErr || !userRow) throw new AppError('User not found', 403);
-			if (!['developer', 'leader'].includes(userRow.role)) {
-				throw new AppError('You are not authorized to update sermons', 403);
-			}
-			if (userRow.role === 'leader' && existing.created_by !== req.user.id) {
-				throw new AppError('Leaders may only update sermons they created', 403);
-			}
+		// check user role and ownership: developers can update any sermon; leaders only their own
+		const { data: userRow, error: userErr } = await supabase
+			.from('users')
+			.select('role')
+			.eq('id', req.user.id)
+			.single();
+		if (userErr || !userRow) throw new AppError('User not found', 403);
+		if (!['developer', 'leader'].includes(userRow.role)) {
+			throw new AppError('You are not authorized to update sermons', 403);
+		}
+
+		// fetch existing sermon to check ownership
+		const { data: existing, error: checkError } = await supabase
+			.from('sermons')
+			.select('created_by')
 			.eq('id', req.params.sermonId)
 			.single();
 
 		if (checkError || !existing) throw new AppError('Sermon not found', 404);
 
-		// validate optional sermonSeries UUID to avoid DB errors
-		if (req.body.sermonSeries && !uuidRegex.test(req.body.sermonSeries)) {
-			throw new AppError('Invalid sermonSeries id format', 400);
+		if (userRow.role === 'leader' && existing.created_by !== req.user.id) {
+			throw new AppError('Leaders may only update sermons they created', 403);
 		}
 
 		const updateData = {
