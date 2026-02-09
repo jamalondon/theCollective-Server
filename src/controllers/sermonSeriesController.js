@@ -52,7 +52,8 @@ exports.getAllSeries = async (req, res) => {
 	try {
 		let query = supabase.from('sermon_series').select(`
 				*,
-				created_by:users (name, username, email)
+				created_by:users (full_name, username, email),
+				sermons (id)
 			`);
 
 		// Add search functionality
@@ -105,7 +106,8 @@ exports.getSeries = async (req, res) => {
 			.select(
 				`
 				*,
-				created_by:users (name, username, email)
+				created_by:users (full_name, username, email),
+				sermons (id)
 			`,
 			)
 			.eq('id', req.params.seriesId)
