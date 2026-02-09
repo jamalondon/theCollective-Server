@@ -1,61 +1,113 @@
-# 🤖 Welcome to Your AI Coding Agent Guidelines
+Core Philosophy
+Goal: Help the developer learn by doing — through clear explanations, modular design, and consistent reflection. The agent should not only produce code but also teach reasoning, demonstrate best practices, and ensure maintainable architecture.
 
-Hey there, fellow coder! This folder is your go-to reference for writing clean, friendly, and efficient code that’s easy to maintain and delightful to read. Whether you're building UI components or backend logic, these principles will keep our codebase joyful and sane.
+Follow the Plan → Act → Reflect method for all coding tasks.
 
----
+Workflow Rules
 
-## ✨ Coding Philosophy
+1. Plan
+   Before writing any code:
 
-- **Small is beautiful**: Break down logic into bite-sized components and modules.
-- **Comments are kindness**: Explain _why_, not just _what_. Your future self will thank you.
-- **No duplication**: DRY (Don't Repeat Yourself) is our mantra.
-- **Friendly UI**: Code should feel welcoming—use clear naming, helpful comments, and intuitive structure.
+Generate a detailed plan.md file describing steps, objectives, dependencies, and design reasoning.
 
----
+Break the task into small, incremental milestones.
 
-## ✅ Do
+Highlight potential pitfalls and design choices.
 
-- 🔹 **Use small components**  
-  Keep components focused. If it’s doing more than one thing, it’s probably doing too much.
+Ask for clarification before assuming intent or context.
 
-- 🔹 **Keep files and diffs small**  
-  Easier to review, easier to debug. Avoid sweeping changes unless explicitly requested.
+2. Act
+   When coding:
 
-- 🔹 **Comment generously**  
-  Every function, class, and tricky block should have a comment explaining its purpose.
+Implement only one feature or change per iteration.
 
-- 🔹 **Use existing components**  
-  If a reusable component exists, use it! Don’t reinvent the wheel.
+Adhere to DRY, SOLID, and consistent code style conventions.
 
----
+Use clear and descriptive names for all identifiers — avoid abbreviations and meaningless terms.
 
-## 🚫 Don't
+Never duplicate code — extract reusable logic into helper functions, modules, or classes.
 
-- ❌ **Avoid raw `div`s**  
-  If a styled or semantic component exists, use that instead. It keeps the UI consistent and accessible.
+Use modern syntax and formatting rules enforced by linters and formatters (e.g., Prettier, ESLint).
 
-- ❌ **No heavy dependencies without approval**  
-  Every new dependency adds weight. Check with the team before adding anything bulky.
+3. Reflect
+   After coding:
 
-- ❌ **Don’t duplicate logic**  
-  If you find yourself copy-pasting, pause and refactor into a shared utility or component.
+Summarize what was completed and why certain decisions were made.
 
----
+Explain architectural implications or refactoring opportunities.
 
-## 🧠 Tips for Writing Friendly Code
+Identify limitations or potential issues before merging.
 
-- Use **descriptive names**: `handleSubmit()` is better than `doThing()`.
-- Prefer **early returns** over nested conditionals.
-- Keep **functions short**—ideally under 30 lines.
-- Use **consistent formatting** and linting rules.
-- Write **unit tests** for critical logic.
+Ask for developer review or approval on critical changes.
 
----
+Coding Standards
+DRY (Don’t Repeat Yourself)
+Avoid any repetition. Shared logic should be extracted into a function, class, or separate utility module.
 
-## 📚 Folder Structure Suggestions
+SOLID Principles
+Follow these five key design principles:
 
-- Consistency: Use the same naming conventions and structure patterns across all projects
-- Clarity: Folder names should clearly indicate their purpose
-- Scalability: Structure should accommodate growth from small to large projects
-- Separation of Concerns: Group related files together, separate different types of functionality
-- Convention Over Configuration: Follow established patterns from popular frameworks and tools
+Single Responsibility: Each class or function handles one concern.
+
+Open–Closed: Code should be open to extension, closed to modification.
+
+Liskov Substitution: Derived classes must fully substitute their base classes.
+
+Interface Segregation: Prefer small, specific interfaces over large, general ones.
+
+Dependency Inversion: Depend on abstractions, not concrete implementations.
+
+Naming and Syntax
+Use descriptive and intention-revealing names (e.g., fetchUserProfile() instead of getData()).
+
+Maintain consistent casing, indentation, and formatting across the entire project.
+
+Write readable, modular functions — maximum 30–40 lines per function, if possible.
+
+Commenting and Documentation
+Write comments that explain why decisions are made, not just what the code does.
+
+Keep inline comments concise and focused.
+
+Maintain up-to-date README.md and API documentation.
+
+Include docstrings for classes, functions, and modules.
+
+For new features, summarize purpose, inputs, outputs, and expected behavior.
+
+Safety and Verification
+No guessing. If uncertain about context or user intent, ask for clarification.
+
+Read before editing: Always load and review existing files before modifying code.
+
+Require human approval before altering critical or core files (e.g., architecture, configuration, security logic).
+
+Implement unit tests and integration tests for all new or changed functions.
+
+Verify test coverage and run all tests before finalizing commits.
+
+Teaching and Interaction Guidelines
+Explain the reasoning behind code suggestions — don’t just output code.
+
+Offer learning opportunities by elaborating on design patterns, data structures, or alternative approaches.
+
+Encourage best practices such as version control discipline (commits, branching) and semantic versioning.
+
+End every major iteration with a short review summary that lists:
+
+What was added or changed.
+
+Why the change was made.
+
+What to learn or watch for next time.
+
+Continuous Improvement
+The agent should:
+
+Suggest refactors or optimizations over time.
+
+Recommend educational resources (docs, tutorials, or patterns) related to ongoing work.
+
+Periodically audit the codebase for maintainability, complexity, and structure.
+
+Promote a growth mindset: progress over perfection, learning over shortcuts.
