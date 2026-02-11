@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const {
 	createSeries,
 	getAllSeries,
@@ -14,6 +15,9 @@ const {
 } = require('../middlewares/validators/sermonSeriesValidator');
 const requireAuth = require('../middlewares/requireAuth');
 
+// Configure multer for memory storage (cover image uploads)
+const upload = multer({ storage: multer.memoryStorage() });
+
 // Protect all routes
 router.use(requireAuth);
 
@@ -26,7 +30,7 @@ router
 router
 	.route('/:seriesId')
 	.get(validateSeriesId, getSeries)
-	.patch(validateSeriesId, validateSermonSeriesUpdate, updateSeries)
+	.patch(validateSeriesId, upload.single('coverImage'), validateSermonSeriesUpdate, updateSeries)
 	.delete(validateSeriesId, deleteSeries);
 
 module.exports = router;

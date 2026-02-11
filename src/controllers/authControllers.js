@@ -235,6 +235,16 @@ exports.verifyToken = async (req, res, next) => {
 			return next(new AppError('User not found', 404));
 		}
 
+		// If user has a phone number but hasn't verified via SMS, redirect to verification
+		if (user.phone_number && !user.verified) {
+			return res.json({
+				verificationRequired: true,
+				username: user.username,
+				phoneNumber: user.phone_number,
+				userID: user.id,
+			});
+		}
+
 		// Return user information
 		res.json({
 			token, // Return the same token

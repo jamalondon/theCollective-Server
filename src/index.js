@@ -55,6 +55,7 @@ logger.token('localdate', () => {
 	return new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' });
 });
 
+//extract the user info for the logger. If it fails, return a dash
 logger.token('user', (req) => {
 	try {
 		//extract the user from the request

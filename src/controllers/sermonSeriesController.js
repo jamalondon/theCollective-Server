@@ -132,10 +132,15 @@ exports.getSeries = async (req, res) => {
 
 exports.updateSeries = async (req, res) => {
 	try {
+		// Role check: only developer or leader can update
+		if (req.user.role !== 'developer' && req.user.role !== 'leader') {
+			throw new AppError('You are not authorized to update sermon series', 403);
+		}
+
 		// First check if series exists and user is authorized
 		const { data: existingSeries, error: checkError } = await supabase
 			.from('sermon_series')
-			.select('created_by')
+			.select('created_by, cover_image')
 			.eq('id', req.params.seriesId)
 			.single();
 
@@ -164,6 +169,47 @@ exports.updateSeries = async (req, res) => {
 					}
 				: undefined,
 		};
+
+		// Handle file upload for cover image (multipart/form-data)
+		if (req.file) {
+			const bucketName = 'sermon-series-covers';
+
+			// Delete old cover image from storage if it exists
+			if (existingSeries.cover_image && existingSeries.cover_image.url) {
+				const oldUrl = existingSeries.cover_image.url;
+				const urlParts = oldUrl.split(`${bucketName}/`);
+				if (urlParts.length > 1) {
+					const oldFilePath = urlParts[1];
+					await supabase.storage.from(bucketName).remove([oldFilePath]);
+				}
+			}
+
+			// Upload new cover image
+			const timestamp = new Date().getTime();
+			const fileExtension = req.file.originalname.split('.').pop();
+			const fileName = `series-covers/${req.params.seriesId}-${timestamp}.${fileExtension}`;
+
+			const { error: uploadError } = await supabase.storage
+				.from(bucketName)
+				.upload(fileName, req.file.buffer, {
+					contentType: req.file.mimetype,
+					upsert: true,
+				});
+
+			if (uploadError) {
+				throw uploadError;
+			}
+
+			// Get the public URL
+			const {
+				data: { publicUrl },
+			} = supabase.storage.from(bucketName).getPublicUrl(fileName);
+
+			updateData.cover_image = {
+				url: publicUrl,
+				public_id: fileName,
+			};
+		}
 
 		// Remove undefined values
 		Object.keys(updateData).forEach(

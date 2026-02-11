@@ -26,6 +26,10 @@ router.get('/search', requireAuth, userController.searchUsers);
 // Get all users
 router.get('/all-users', requireAuth, userController.getAllUsers);
 
+// User preferences routes
+router.get('/preferences', requireAuth, userController.getPreferences);
+router.put('/preferences', requireAuth, userController.updatePreferences);
+
 // Get user profile with activity summary (own profile or specific user by ID)
 router.get('/profile/:userId?', requireAuth, userController.getUserProfile);
 

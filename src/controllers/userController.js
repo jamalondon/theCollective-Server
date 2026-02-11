@@ -7,8 +7,13 @@ require('dotenv').config();
 // Initialize Supabase client
 const supabase = createClient(
 	process.env.SUPABASE_URL,
-	process.env.SUPABASE_SERVICE_ROLE_KEY
+	process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
+
+const DEFAULT_PREFERENCES = {
+	useSystemTheme: true,
+	darkMode: false,
+};
 
 /*
  Upload profile picture for authenticated user
@@ -110,7 +115,6 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
 	console.log('🎯 Search results:', users);
 	console.log('❌ Search error:', error);
 
-	
 	if (error) {
 		console.error('Search users error:', error);
 		throw error;
@@ -142,7 +146,7 @@ exports.getUserPrayerRequests = catchAsync(async (req, res, next) => {
 			anonymous,
 			owner_id,
 			photos
-		`
+		`,
 		)
 		.eq('owner_id', req.user.id)
 		.order('created_at', { ascending: false })
@@ -200,7 +204,7 @@ exports.getUserPrayerComments = catchAsync(async (req, res, next) => {
 				owner_id,
 				anonymous
 			)
-		`
+		`,
 		)
 		.eq('user_id', req.user.id)
 		.order('created_at', { ascending: false })
@@ -279,7 +283,7 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 				status,
 				owner_id
 			)
-		`
+		`,
 		)
 		.eq('user_id', req.user.id)
 		.order('registered_at', { ascending: false });
@@ -291,7 +295,7 @@ exports.getUserEvents = catchAsync(async (req, res, next) => {
 
 	const { data: userEvents, error } = await query.range(
 		offset,
-		offset + limit - 1
+		offset + limit - 1,
 	);
 
 	if (error) throw error;
@@ -360,7 +364,7 @@ exports.getUserSermonDiscussions = catchAsync(async (req, res, next) => {
 					series_image
 				)
 			)
-		`
+		`,
 		)
 		.eq('user_id', req.user.id)
 		.order('created_at', { ascending: false })
@@ -403,7 +407,9 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 	// Get user basic information
 	const { data: user, error: userError } = await supabase
 		.from('users')
-		.select('id, username, full_name, profile_picture, date_of_birth, created_at')
+		.select(
+			'id, username, full_name, profile_picture, date_of_birth, created_at',
+		)
 		.eq('id', userId)
 		.single();
 
@@ -492,7 +498,9 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 	if (eventsResponse.error) throw eventsResponse.error;
 
 	// Populate owner info for prayer requests
-	const populatedPrayerRequests = await populateOwner(prayerRequestsResponse.data || []);
+	const populatedPrayerRequests = await populateOwner(
+		prayerRequestsResponse.data || [],
+	);
 
 	// Populate owner info for events
 	const populatedEvents = await populateOwner(eventsResponse.data || []);
@@ -510,7 +518,8 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 		if (prLikeError) throw prLikeError;
 
 		prLikes?.forEach((like) => {
-			prayerRequestLikeMap[like.prayer_request_id] = (prayerRequestLikeMap[like.prayer_request_id] || 0) + 1;
+			prayerRequestLikeMap[like.prayer_request_id] =
+				(prayerRequestLikeMap[like.prayer_request_id] || 0) + 1;
 		});
 
 		// Get user's likes for prayer requests
@@ -559,12 +568,14 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 
 	// Add type identifier, like count, and likedByUser to each item and combine
 	// Exclude comments array from feed items (comments are fetched separately on detail view)
-	const prayerRequests = populatedPrayerRequests.map(({ comments, ...item }) => ({
-		...item,
-		type: 'prayer_request',
-		likeCount: prayerRequestLikeMap[item.id] || 0,
-		likedByUser: userPrayerRequestLikes.has(item.id),
-	}));
+	const prayerRequests = populatedPrayerRequests.map(
+		({ comments, ...item }) => ({
+			...item,
+			type: 'prayer_request',
+			likeCount: prayerRequestLikeMap[item.id] || 0,
+			likedByUser: userPrayerRequestLikes.has(item.id),
+		}),
+	);
 
 	const events = populatedEvents.map(({ comments, ...item }) => ({
 		...item,
@@ -575,7 +586,7 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 
 	// Combine and sort by creation date
 	const newsFeed = [...prayerRequests, ...events].sort(
-		(a, b) => new Date(b.created_at) - new Date(a.created_at)
+		(a, b) => new Date(b.created_at) - new Date(a.created_at),
 	);
 
 	res.status(200).json({
@@ -588,6 +599,99 @@ exports.getNewsFeed = catchAsync(async (req, res, next) => {
 				total: newsFeed.length,
 			},
 		},
+	});
+});
+
+// ============================================
+// USER PREFERENCES FUNCTIONS
+// ============================================
+
+/*
+ Get user preferences for authenticated user
+ Returns preferences JSONB from users table, with defaults for missing values
+ GET /API/v1/users/preferences
+ */
+exports.getPreferences = catchAsync(async (req, res, next) => {
+	const { data: user, error } = await supabase
+		.from('users')
+		.select('preferences')
+		.eq('id', req.user.id)
+		.single();
+
+	if (error) {
+		if (error.code === 'PGRST116') {
+			return next(new AppError('User not found', 404));
+		}
+		throw error;
+	}
+
+	const preferences = {
+		...DEFAULT_PREFERENCES,
+		...(user.preferences || {}),
+	};
+
+	res.status(200).json({
+		success: true,
+		data: { preferences },
+	});
+});
+
+/*
+ Update user preferences for authenticated user
+ Merges provided keys into existing preferences JSONB
+ PUT /API/v1/users/preferences
+ */
+exports.updatePreferences = catchAsync(async (req, res, next) => {
+	const allowedKeys = ['useSystemTheme', 'darkMode'];
+	const updates = {};
+
+	for (const key of allowedKeys) {
+		if (req.body[key] !== undefined) {
+			if (typeof req.body[key] !== 'boolean') {
+				return next(new AppError(`${key} must be a boolean value`, 400));
+			}
+			updates[key] = req.body[key];
+		}
+	}
+
+	if (Object.keys(updates).length === 0) {
+		return next(new AppError('No valid preferences provided to update', 400));
+	}
+
+	// Read current preferences
+	const { data: user, error: readError } = await supabase
+		.from('users')
+		.select('preferences')
+		.eq('id', req.user.id)
+		.single();
+
+	if (readError) {
+		if (readError.code === 'PGRST116') {
+			return next(new AppError('User not found', 404));
+		}
+		throw readError;
+	}
+
+	// Merge: defaults <- existing <- new updates
+	const mergedPreferences = {
+		...DEFAULT_PREFERENCES,
+		...(user.preferences || {}),
+		...updates,
+	};
+
+	// Write back
+	const { error: updateError } = await supabase
+		.from('users')
+		.update({ preferences: mergedPreferences })
+		.eq('id', req.user.id);
+
+	if (updateError) {
+		throw updateError;
+	}
+
+	res.status(200).json({
+		success: true,
+		data: { preferences: mergedPreferences },
 	});
 });
 
@@ -609,7 +713,9 @@ exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 	}
 
 	if (userId === requesterId) {
-		return next(new AppError('You cannot send a friend request to yourself', 400));
+		return next(
+			new AppError('You cannot send a friend request to yourself', 400),
+		);
 	}
 
 	// Check if target user exists
@@ -627,7 +733,9 @@ exports.sendFriendRequest = catchAsync(async (req, res, next) => {
 	const { data: existingFriendship, error: checkError } = await supabase
 		.from('friendships')
 		.select('*')
-		.or(`and(requester_id.eq.${requesterId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${requesterId})`)
+		.or(
+			`and(requester_id.eq.${requesterId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${requesterId})`,
+		)
 		.maybeSingle();
 
 	if (checkError && checkError.code !== 'PGRST116') {
@@ -817,7 +925,9 @@ exports.removeFriend = catchAsync(async (req, res, next) => {
 	const { data: friendship, error: fetchError } = await supabase
 		.from('friendships')
 		.select('*')
-		.or(`and(requester_id.eq.${currentUserId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${currentUserId})`)
+		.or(
+			`and(requester_id.eq.${currentUserId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${currentUserId})`,
+		)
 		.eq('status', 'accepted')
 		.maybeSingle();
 
@@ -868,7 +978,7 @@ exports.getFriends = catchAsync(async (req, res, next) => {
 	const friendIds = friendships.map((friendship) =>
 		friendship.requester_id === userId
 			? friendship.addressee_id
-			: friendship.requester_id
+			: friendship.requester_id,
 	);
 
 	if (friendIds.length === 0) {
@@ -1083,7 +1193,9 @@ exports.getFriendshipStatus = catchAsync(async (req, res, next) => {
 	const { data: friendship, error: friendshipError } = await supabase
 		.from('friendships')
 		.select('*')
-		.or(`and(requester_id.eq.${currentUserId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${currentUserId})`)
+		.or(
+			`and(requester_id.eq.${currentUserId},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${currentUserId})`,
+		)
 		.maybeSingle();
 
 	if (friendshipError && friendshipError.code !== 'PGRST116') {
